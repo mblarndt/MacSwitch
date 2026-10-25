@@ -37,6 +37,14 @@ Esc blendet sie aus (der Build läuft weiter, die Kachel zeigt den Stand), X bri
 - Die Dateien werden nur verlinkt, Zwischenergebnisse liegen in `<Ausgabe>/NxNative-Work/<Spielname>/` (ein zweiter Build geht schneller; danach löschbar).
 - Der erste Build braucht 30–60 Minuten und etwa das Doppelte der NSP-Größe plus 10 GB frei.
 
+### Update oder DLC nachinstallieren
+
+Bei Spielen, die mit nxnative gebaut wurden, erscheint in der Fußzeile „+ Updates & DLC" (Taste `+` oder anklicken).
+Die Seite verlinkt eine Update- oder DLC-Datei in den Arbeitsordner `<Ausgabe>/NxNative-Work/<Spielname>/` neben der App und baut mit „Neu bauen" neu.
+Das gilt auch für Apps, die „NxNative Builder" gebaut hat; für alle anderen Apps gibt es die Fußzeile nicht.
+Gleicher Name und Pfad: Menüeintrag und Spielstand bleiben. Das Skript übernimmt unveränderte Stufen aus dem letzten Lauf, nur die neue Version wird neu entpackt und umgeschrieben.
+Y entfernt eine Datei wieder (nur den Link, nie die Datei selbst).
+
 ## Spielstart
 
 MacSwitch deckt den Bildschirm ab, startet die App im Hintergrund und legt sich erst hinter sie, wenn ihr Fenster da ist.

@@ -143,9 +143,7 @@ struct BuilderView: View {
         let home = FileManager.default.homeDirectoryForCurrentUser
         switch field {
         case .repo: return home
-        case .keys:
-            let switchDir = home.appendingPathComponent(".switch")
-            return builder.keys?.deletingLastPathComponent() ?? (FileManager.default.fileExists(atPath: switchDir.path) ? switchDir : home)
+        case .keys: return builder.keysStart
         default: return builder.rom?.deletingLastPathComponent() ?? home
         }
     }

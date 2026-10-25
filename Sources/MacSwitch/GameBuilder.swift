@@ -54,7 +54,44 @@ final class GameBuilder: ObservableObject {
 
     /// Der nxnative-Ordner enthält beide Skripte. make_mac_app.py fehlt in einem frischen Klon: sonst scheiterte der Lauf erst nach dem Build.
     var repoValid: Bool { Self.scripts.allSatisfy { FileManager.default.fileExists(atPath: script($0)) } }
-    var ready: Bool { rom != nil && keys != nil && out != nil && repoValid && !running }
+    var canRebuild: Bool { keys != nil && repoValid && !running }
+    var ready: Bool { rom != nil && out != nil && canRebuild }
+
+    /// Wo der Browser für prod.keys anfängt: dort, wo zuletzt eine lag, sonst ~/.switch.
+    var keysStart: URL {
+        let home = FileManager.default.homeDirectoryForCurrentUser, switchDir = home.appendingPathComponent(".switch")
+        return keys?.deletingLastPathComponent() ?? (FileManager.default.fileExists(atPath: switchDir.path) ? switchDir : home)
+    }
+
+    /// <Ausgabe>/NxNative-Work/<Spielname> neben der .app: dort liegen die verlinkten NSPs, egal ob MacSwitch oder NxNative Builder die App gebaut hat.
+    /// nil bei Apps, die nicht so gebaut wurden – für die gibt es keine Updates oder DLC.
+    static func workFolder(of game: Game) -> URL? {
+        let app = game.url.resolvingSymlinksInPath()
+        let dir = app.deletingLastPathComponent().appendingPathComponent("NxNative-Work/\(app.deletingPathExtension().lastPathComponent)")
+        return FileManager.default.fileExists(atPath: dir.path) ? dir : nil
+    }
+
+    /// Die Spieldateien im Arbeitsordner (Basisspiel, Updates, DLC); die Ordner daneben (<id>_build/) sind Zwischenstände.
+    static func installedFiles(in work: URL) -> [URL] {
+        let urls = (try? FileManager.default.contentsOfDirectory(at: work, includingPropertiesForKeys: nil)) ?? []
+        return urls
+            .filter { extensions.contains($0.pathExtension.lowercased()) }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+    }
+
+    /// Verknüpft eine Update-/DLC-Datei in den Arbeitsordner, ohne die vorhandenen Links anzufassen. Das Skript erkennt selbst, was Update und was DLC ist.
+    static func install(_ file: URL, into work: URL) throws {
+        let fm = FileManager.default, ext = file.pathExtension.lowercased()
+        guard extensions.contains(ext) else { throw Failure(errorDescription: "\(file.lastPathComponent) ist keine NSP-/XCI-/NSZ-/XCZ-Datei.") }
+        let base = file.deletingPathExtension().lastPathComponent + "." + ext
+        var n = 0
+        while true {
+            let link = work.appendingPathComponent((n == 0 ? "" : "\(n)-") + base)
+            if (try? fm.attributesOfItem(atPath: link.path)) == nil { return try fm.createSymbolicLink(at: link, withDestinationURL: file) }
+            if (try? fm.destinationOfSymbolicLink(atPath: link.path)) == file.path { return } // dieselbe Datei nochmal: nichts zu tun
+            n += 1 // anderer Inhalt unter gleichem Namen (zwei DLC-Ordner)
+        }
+    }
 
     private func script(_ name: String) -> String { repo.appendingPathComponent("scripts/\(name)").path }
 
@@ -69,14 +106,27 @@ final class GameBuilder: ObservableObject {
 
     /// `done` bekommt die fertige .app (im Menü: zur Library hinzufügen).
     func start(done: @escaping (URL) -> Void) {
-        guard ready, let rom, let keys, let out else { return }
+        guard ready, let rom, let out else { return }
         name = Self.name(rom)
         target = out.appendingPathComponent(name + ".app")
+        do { try begin(link(into: out.appendingPathComponent("NxNative-Work/\(name)"), [rom] + [update].compactMap { $0 } + dlcs), done) } catch { fail(error.localizedDescription) }
+    }
+
+    /// Baut ein vorhandenes Spiel aus seinem Arbeitsordner neu (nach einem installierten Update oder DLC): gleicher Name, gleicher Pfad, die Spielstände bleiben.
+    /// Was sich nicht geändert hat, übernimmt das Skript aus dem letzten Lauf.
+    func rebuild(_ game: Game, done: @escaping (URL) -> Void) {
+        guard canRebuild, let work = Self.workFolder(of: game) else { return }
+        target = game.url.resolvingSymlinksInPath()
+        name = target.deletingPathExtension().lastPathComponent
+        begin(work, done)
+    }
+
+    private func begin(_ nsp: URL, _ done: @escaping (URL) -> Void) {
+        guard let keys else { return }
         onDone = done
+        running = true; error = ""; lastError = ""; runCommand = ""; making = false; log = []; overall = 0
+        k = 1; n = 1; frac = 0; stageName = ""; stepName = ""; status = "Starte …"; detail = ""
         do {
-            let nsp = try link(into: out.appendingPathComponent("NxNative-Work/\(name)"), [rom] + [update].compactMap { $0 } + dlcs)
-            running = true; error = ""; lastError = ""; runCommand = ""; making = false; log = []; overall = 0
-            k = 1; n = 1; frac = 0; stageName = ""; stepName = ""; status = "Starte …"; detail = ""
             try launch([script("build_ipa_from_nsp.py"), nsp.path, "-k", keys.path, "--progress", "json", "--platform", "mac"])
             activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled], reason: "Spiel wird gebaut")
         } catch { fail(error.localizedDescription) }

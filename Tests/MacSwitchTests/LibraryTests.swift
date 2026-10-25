@@ -53,19 +53,22 @@ final class BuilderTests: XCTestCase {
     }
 
     /// Ganzer Ablauf mit Attrappen-Skripten statt nxnative: Fortschrittszeilen lesen, danach make_mac_app.py mit dem Startbefehl, dann `done`.
+    /// Anschließend ein Update installieren und neu bauen: das Skript bekommt den Arbeitsordner mit dem neuen Link.
     func testRunsBuildThenMakeAppAndReportsApp() throws {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let scripts = tmp.appendingPathComponent("repo/scripts")
         try FileManager.default.createDirectory(at: scripts, withIntermediateDirectories: true)
         try """
-        import json, sys
+        import json, os, sys
         assert sys.argv[-2:] == ["--platform", "mac"], sys.argv
+        open(os.path.join(os.path.dirname(sys.argv[1]), "seen.txt"), "w").write("\\n".join(sorted(os.listdir(sys.argv[1]))))
         for e in ({"ev": "stage", "k": 1, "n": 1, "name": "Fake"}, {"ev": "say", "msg": "cd /tmp && DM_ROMFS=x host patched"}):
             print(json.dumps(e), flush=True)
         """.write(to: scripts.appendingPathComponent("build_ipa_from_nsp.py"), atomically: true, encoding: .utf8)
         try """
-        import os, sys
+        import os, shutil, sys
         assert sys.argv[2] == "Fake Game" and sys.argv[3].startswith("cd /tmp"), sys.argv
+        shutil.rmtree(sys.argv[1], ignore_errors=True)
         os.mkdir(sys.argv[1])
         """.write(to: scripts.appendingPathComponent("make_mac_app.py"), atomically: true, encoding: .utf8)
         let rom = tmp.appendingPathComponent("Fake Game [0100000000000000][v0].nsp")
@@ -79,14 +82,38 @@ final class BuilderTests: XCTestCase {
         try FileManager.default.createDirectory(at: builder.out!, withIntermediateDirectories: true)
         XCTAssertTrue(builder.ready)
 
+        func wait() {
+            let deadline = Date().addingTimeInterval(20)
+            while builder.running && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
+        }
+
         var app: URL?
         builder.start { app = $0 }
-        let deadline = Date().addingTimeInterval(20)
-        while builder.running && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
+        wait()
 
         XCTAssertEqual(builder.status, "Fertig", builder.error)
         XCTAssertEqual(app?.lastPathComponent, "Fake Game.app")
         XCTAssertTrue(FileManager.default.fileExists(atPath: app?.path ?? ""))
+
+        let game = Game(app: app!)
+        let work = try XCTUnwrap(GameBuilder.workFolder(of: game))
+        XCTAssertNil(GameBuilder.workFolder(of: Game(app: tmp.appendingPathComponent("Other.app"))))
+
+        let update = tmp.appendingPathComponent("Fake Game [0100000000000800][v65536].nsp")
+        try Data().write(to: update)
+        try GameBuilder.install(update, into: work)
+        try GameBuilder.install(update, into: work) // dieselbe Datei nochmal: kein zweiter Link
+        XCTAssertEqual(GameBuilder.installedFiles(in: work).map(\.lastPathComponent), [rom.lastPathComponent, update.lastPathComponent])
+        XCTAssertThrowsError(try GameBuilder.install(tmp.appendingPathComponent("notes.txt"), into: work))
+
+        var rebuilt: URL?
+        builder.rebuild(game) { rebuilt = $0 }
+        wait()
+
+        XCTAssertEqual(builder.status, "Fertig", builder.error)
+        XCTAssertEqual(rebuilt?.lastPathComponent, "Fake Game.app")
+        let seen = try String(contentsOf: builder.out!.appendingPathComponent("NxNative-Work/seen.txt"), encoding: .utf8)
+        XCTAssertTrue(seen.contains("[v65536]"), seen)
     }
 }
 

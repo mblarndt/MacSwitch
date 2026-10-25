@@ -68,7 +68,12 @@ struct HomeView: View {
     @State private var showSettings = false
     @State private var showBrowser = false
     @State private var showBuilder = false
+    @State private var optionsGame: Game?
     @FocusState private var focused: Bool
+
+    private var selectedGame: Game? { !onDock && library.games.indices.contains(gameIndex) ? library.games[gameIndex] : nil }
+    /// Updates und DLC gibt es nur für Spiele, die mit nxnative gebaut wurden (Arbeitsordner neben der App).
+    private var hasOptions: Bool { selectedGame.map { GameBuilder.workFolder(of: $0) != nil } ?? false }
 
     var body: some View {
         // Feste 1280×720-Bühne, die ins Fenster skaliert wird: Proportionen bleiben bei jeder Größe wie auf der Konsole.
@@ -81,6 +86,10 @@ struct HomeView: View {
                 if showBuilder {
                     BuilderView { showBuilder = false }.transition(.move(edge: .trailing).combined(with: .opacity))
                 }
+                if let game = optionsGame {
+                    GameOptionsView(game: game, close: { optionsGame = nil }, showBuild: { optionsGame = nil; showBuilder = true })
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
             }
             .frame(width: 1280, height: 720)
             .scaleEffect(min(geo.size.width / 1280, geo.size.height / 720))
@@ -88,6 +97,7 @@ struct HomeView: View {
         }
         .animation(.easeOut(duration: 0.25), value: showBrowser)
         .animation(.easeOut(duration: 0.25), value: showBuilder)
+        .animation(.easeOut(duration: 0.25), value: optionsGame?.id)
         .background(Theme.background.ignoresSafeArea())
         .background(WindowAccessor { session.attach($0) })
         .overlay {
@@ -102,6 +112,7 @@ struct HomeView: View {
         .onChange(of: showSettings) { _, open in if !open { focused = true } }
         .onChange(of: showBrowser) { _, open in if !open { focused = true } }
         .onChange(of: showBuilder) { _, open in if !open { focused = true } }
+        .onChange(of: optionsGame?.id) { _, id in if id == nil { focused = true } }
         .onChange(of: library.games.count) { _, n in gameIndex = min(gameIndex, n + 1) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in library.reload() }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
@@ -112,18 +123,22 @@ struct HomeView: View {
             }
             return true
         }
-        .onKeyPress(phases: [.down, .repeat]) { press in
-            guard session.game == nil, !showBrowser, !showBuilder else { return .handled } // während Start/Spiel und auf den Seiten darüber keine Menü-Eingaben
-            switch press.key {
-            case .leftArrow: move(dx: -1)
-            case .rightArrow: move(dx: 1)
-            case .upArrow: onDock = false
-            case .downArrow: onDock = true
-            case .return, .space: if press.phase == .down { activate() }
-            default: return .ignored
-            }
-            return .handled
+        .onKeyPress(phases: [.down, .repeat], action: handle)
+    }
+
+    private func handle(_ press: KeyPress) -> KeyPress.Result {
+        guard session.game == nil, !showBrowser, !showBuilder, optionsGame == nil else { return .handled } // während Start/Spiel und auf den Seiten darüber keine Menü-Eingaben
+        switch press.key {
+        case .leftArrow: move(dx: -1)
+        case .rightArrow: move(dx: 1)
+        case .upArrow: onDock = false
+        case .downArrow: onDock = true
+        case .return, .space: if press.phase == .down { activate() }
+        default:
+            guard press.characters == "+" else { return .ignored }
+            if press.phase == .down { openOptions() }
         }
+        return .handled
     }
 
     private var stage: some View {
@@ -210,9 +225,10 @@ struct HomeView: View {
     private var footer: some View {
         VStack(spacing: 12) {
             Rectangle().fill(Theme.line).frame(height: 1)
-            HStack {
+            HStack(spacing: 36) {
                 Spacer()
-                Hint(key: "A", label: onDock ? "OK" : "Starten")
+                if hasOptions { Hint(key: "+", label: "Updates & DLC").onTapGesture { openOptions() } }
+                Hint(key: "A", label: onDock ? "OK" : selectedGame == nil ? "Öffnen" : "Starten")
             }
         }
     }
@@ -225,6 +241,10 @@ struct HomeView: View {
         } else {
             gameIndex = min(max(gameIndex + dx, 0), library.games.count + 1)
         }
+    }
+
+    private func openOptions() {
+        if hasOptions { optionsGame = selectedGame }
     }
 
     private func tapGame(_ i: Int) {
