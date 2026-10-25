@@ -68,8 +68,12 @@ struct HomeView: View {
     @State private var showSettings = false
     @State private var showBrowser = false
     @State private var showBuilder = false
+    @State private var showControllers = false
     @State private var optionsGame: Game?
     @FocusState private var focused: Bool
+
+    /// Welche Seiten über dem Menü liegen (Bits); 0 = keine. Für Animation, Fokus und gesperrte Menü-Eingaben.
+    private var pages: Int { (showBrowser ? 1 : 0) | (showBuilder ? 2 : 0) | (showControllers ? 4 : 0) | (optionsGame == nil ? 0 : 8) }
 
     private var selectedGame: Game? { !onDock && library.games.indices.contains(gameIndex) ? library.games[gameIndex] : nil }
     /// Updates und DLC gibt es nur für Spiele, die mit nxnative gebaut wurden (Arbeitsordner neben der App).
@@ -80,24 +84,13 @@ struct HomeView: View {
         GeometryReader { geo in
             ZStack {
                 stage
-                if showBrowser {
-                    FileBrowser { showBrowser = false }.transition(.move(edge: .trailing).combined(with: .opacity))
-                }
-                if showBuilder {
-                    BuilderView { showBuilder = false }.transition(.move(edge: .trailing).combined(with: .opacity))
-                }
-                if let game = optionsGame {
-                    GameOptionsView(game: game, close: { optionsGame = nil }, showBuild: { optionsGame = nil; showBuilder = true })
-                        .transition(.move(edge: .trailing).combined(with: .opacity))
-                }
+                overlays
             }
             .frame(width: 1280, height: 720)
             .scaleEffect(min(geo.size.width / 1280, geo.size.height / 720))
             .frame(width: geo.size.width, height: geo.size.height)
         }
-        .animation(.easeOut(duration: 0.25), value: showBrowser)
-        .animation(.easeOut(duration: 0.25), value: showBuilder)
-        .animation(.easeOut(duration: 0.25), value: optionsGame?.id)
+        .animation(.easeOut(duration: 0.25), value: pages)
         .background(Theme.background.ignoresSafeArea())
         .background(WindowAccessor { session.attach($0) })
         .overlay {
@@ -110,9 +103,7 @@ struct HomeView: View {
         .focusEffectDisabled()
         .onAppear { focused = true }
         .onChange(of: showSettings) { _, open in if !open { focused = true } }
-        .onChange(of: showBrowser) { _, open in if !open { focused = true } }
-        .onChange(of: showBuilder) { _, open in if !open { focused = true } }
-        .onChange(of: optionsGame?.id) { _, id in if id == nil { focused = true } }
+        .onChange(of: pages) { _, open in if open == 0 { focused = true } }
         .onChange(of: library.games.count) { _, n in gameIndex = min(gameIndex, n + 1) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in library.reload() }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
@@ -127,7 +118,7 @@ struct HomeView: View {
     }
 
     private func handle(_ press: KeyPress) -> KeyPress.Result {
-        guard session.game == nil, !showBrowser, !showBuilder, optionsGame == nil else { return .handled } // während Start/Spiel und auf den Seiten darüber keine Menü-Eingaben
+        guard session.game == nil, pages == 0 else { return .handled } // während Start/Spiel und auf den Seiten darüber keine Menü-Eingaben
         switch press.key {
         case .leftArrow: move(dx: -1)
         case .rightArrow: move(dx: 1)
@@ -139,6 +130,22 @@ struct HomeView: View {
             if press.phase == .down { openOptions() }
         }
         return .handled
+    }
+
+    @ViewBuilder private var overlays: some View {
+        if showBrowser {
+            FileBrowser { showBrowser = false }.transition(.move(edge: .trailing).combined(with: .opacity))
+        }
+        if showBuilder {
+            BuilderView { showBuilder = false }.transition(.move(edge: .trailing).combined(with: .opacity))
+        }
+        if showControllers {
+            ControllerView { showControllers = false }.transition(.move(edge: .trailing).combined(with: .opacity))
+        }
+        if let game = optionsGame {
+            GameOptionsView(game: game, close: { optionsGame = nil }, showBuild: { optionsGame = nil; showBuilder = true })
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+        }
     }
 
     private var stage: some View {
@@ -259,8 +266,9 @@ struct HomeView: View {
         if onDock {
             switch DockItem.allCases[dockIndex] {
             case .settings: showSettings = true
+            case .controllers: showControllers = true
             case .power: NSApp.terminate(nil)
-            default: break // shortcut: News/eShop/Album/Controller sind nur Optik
+            default: break // shortcut: News/eShop/Album sind nur Optik
             }
         } else if gameIndex == library.games.count {
             showBrowser = true

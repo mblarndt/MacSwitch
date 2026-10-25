@@ -45,6 +45,22 @@ Das gilt auch für Apps, die „NxNative Builder" gebaut hat; für alle anderen 
 Gleicher Name und Pfad: Menüeintrag und Spielstand bleiben. Das Skript übernimmt unveränderte Stufen aus dem letzten Lauf, nur die neue Version wird neu entpackt und umgeschrieben.
 Y entfernt eine Datei wieder (nur den Link, nie die Datei selbst).
 
+## iPhone als Controller
+
+Das Dock-Symbol „Controller" öffnet die Seite für den iPhone-Host: A schaltet ihn ein, danach auf dem iPhone die App
+[AstrisPad](../AstrisPhoneController) öffnen (sie verbindet sich per Bluetooth automatisch). Jedes iPhone bekommt einen Spielerplatz (1–4),
+die Seite zeigt Name und Antwortzeit. Ein wiederkehrendes iPhone bekommt seinen Platz zurück; die Wahl „An/Aus" merkt sich MacSwitch.
+
+Die Spiele lesen die Plätze über einen DSU-Server (cemuhook) auf `127.0.0.1:26760`, den MacSwitch dafür bereitstellt.
+Der nxnative-Host hat dafür einen DSU-Client (`dm/host/dsu_pad.h`, `front_mac.m`): jedes iPhone ist dort ein Spieler wie ein echter Controller, mit analogen Sticks
+(`DM_DSU=0` schaltet den Client ab). **Spiele müssen dafür einmal neu gebaut werden** („Neu bauen" in den Spiel-Optionen), damit sie den neuen Host enthalten.
+
+- Beim ersten Einschalten fragt macOS nach der Bluetooth-Berechtigung. Da `build_app.sh` ad-hoc signiert, fragt es nach jedem neuen Build wieder.
+- MacSwitch und der MacHost aus AstrisPhoneController dürfen nicht gleichzeitig laufen (derselbe Port und dieselbe Bluetooth-Kennung); die Seite meldet „Port 26760 ist belegt".
+- Tastaturausgabe, Ziel-App und Belegungen des MacHost gibt es hier nicht, nur den Weg über DSU. Lautstärketasten und Rückseiten-Tippen des iPhones haben darin keine
+  eigene Taste und kommen nur an, wenn das Layout sie auf eine Switch-Taste legt.
+- Der DSU-Server (`DSUServer.swift`) und der Funk-Teil des Protokolls (`ControllerProtocol.swift`) sind Kopien aus AstrisPhoneController; Änderungen dort bitte hierher übernehmen.
+
 ## Spielstart
 
 MacSwitch deckt den Bildschirm ab, startet die App im Hintergrund und legt sich erst hinter sie, wenn ihr Fenster da ist.
