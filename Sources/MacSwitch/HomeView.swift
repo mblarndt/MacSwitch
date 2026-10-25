@@ -296,11 +296,10 @@ private struct GameTile: View {
 
     @ViewBuilder private var art: some View {
         if let game {
-            // App-Icons sind transparent und haben Rand → auf farbiger Fläche zentrieren, damit die Kachel wie ein Switch-Cover wirkt.
-            let hue = Double(game.title.unicodeScalars.reduce(0) { $0 &+ Int($1.value) } % 360) / 360
             ZStack {
-                LinearGradient(colors: [Color(hue: hue, saturation: 0.45, brightness: 0.60), Color(hue: hue, saturation: 0.60, brightness: 0.30)], startPoint: .top, endPoint: .bottom)
-                Image(nsImage: game.icon).resizable().scaledToFit().padding(28)
+                // Unscharfe, vergrößerte Kopie füllt die abgerundeten Squircle-Ecken des Icons.
+                Image(nsImage: game.icon).resizable().scaledToFill().scaleEffect(1.3).blur(radius: 30)
+                Image(nsImage: game.icon).resizable().scaledToFill()
             }
         } else {
             ZStack {

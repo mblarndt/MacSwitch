@@ -13,7 +13,32 @@ struct Game: Identifiable {
         title = bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
             ?? bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String
             ?? real.deletingPathExtension().lastPathComponent
-        icon = NSWorkspace.shared.icon(forFile: real.path)
+        icon = NSWorkspace.shared.icon(forFile: real.path).trimmed()
+    }
+}
+
+extension NSImage {
+    /// Schneidet den transparenten Rand ab (macOS-Icons haben ~10 % Padding), damit das Icon die ganze Kachel füllt.
+    func trimmed() -> NSImage {
+        let w = 512
+        var rect = NSRect(x: 0, y: 0, width: w, height: w)
+        guard let cg = cgImage(forProposedRect: &rect, context: nil, hints: nil),
+              let ctx = CGContext(data: nil, width: w, height: w, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let data = ctx.data?.assumingMemoryBound(to: UInt8.self)
+        else { return self }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: w))
+
+        var minX = w, minY = w, maxX = -1, maxY = -1
+        for y in 0..<w {
+            for x in 0..<w where data[(y * w + x) * 4 + 3] > 128 { // >50 % deckend: ignoriert Schatten und Antialiasing
+                minX = min(minX, x); maxX = max(maxX, x)
+                minY = min(minY, y); maxY = max(maxY, y)
+            }
+        }
+        guard maxX >= minX, let out = ctx.makeImage()?.cropping(to: CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1))
+        else { return self }
+        return NSImage(cgImage: out, size: NSSize(width: out.width, height: out.height))
     }
 }
 

@@ -1,3 +1,4 @@
+import ApplicationServices
 import AppKit
 import SwiftUI
 
@@ -86,6 +87,21 @@ final class GameSession: ObservableObject {
         state = .running(game)
         window?.level = .normal
         app.activate()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { Self.enterFullScreen(app) } // Fenster ist nach dem Aktivieren erst kurz danach "focused"
+    }
+
+    /// Schaltet das Hauptfenster der App in den nativen Vollbildmodus. Braucht das Bedienungshilfen-Recht; ohne bleibt das Fenster, wie es ist.
+    private static func enterFullScreen(_ app: NSRunningApplication) {
+        // "AXTrustedCheckOptionPrompt" = kAXTrustedCheckOptionPrompt: fragt beim ersten Mal nach dem Recht.
+        guard AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary) else { return }
+        let ax = AXUIElementCreateApplication(app.processIdentifier)
+        for attr in [kAXFocusedWindowAttribute, kAXMainWindowAttribute] {
+            var window: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(ax, attr as CFString, &window) == .success, let window else { continue }
+            // shortcut: Fehler (Fenster ohne Vollbild-Knopf) werden ignoriert, upgrade: Fenster stattdessen per AXSize auf Bildschirmgröße ziehen.
+            AXUIElementSetAttributeValue(window as! AXUIElement, "AXFullScreen" as CFString, kCFBooleanTrue)
+            return
+        }
     }
 
     private static func hasWindow(_ pid: pid_t) -> Bool {

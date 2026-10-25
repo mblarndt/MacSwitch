@@ -28,4 +28,9 @@ MacSwitch deckt den Bildschirm ab, startet die App im Hintergrund und legt sich 
 Vollbild-Apps wirken dadurch wie Teil von MacSwitch, kleine Fenster liegen auf schwarzem Hintergrund.
 Zurück ins Menü („Home"): ⌘Tab zu MacSwitch, Klick auf den schwarzen Hintergrund oder Spiel beenden.
 
+Beim Start wird das Hauptfenster der App in den nativen Vollbildmodus geschaltet (macOS wechselt dafür in einen eigenen Space).
+Das geht nur mit dem Bedienungshilfen-Recht: Beim ersten Spielstart fragt macOS danach (Systemeinstellungen → Datenschutz & Sicherheit →
+Bedienungshilfen → MacSwitch). Ohne das Recht startet die App, wie sie will. Da `build_app.sh` ad-hoc signiert, muss das Recht nach
+jedem neuen Build ggf. neu erteilt werden (Eintrag entfernen und wieder hinzufügen).
+
 Mac kann fremde Fenster nicht in ein eigenes Fenster einbetten – die App läuft weiter als eigener Prozess.

@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import MacSwitch
 
@@ -29,5 +30,18 @@ final class LibraryTests: XCTestCase {
         try Data().write(to: dir.appendingPathComponent("notes.txt"))
 
         XCTAssertEqual(FileBrowser.entries(in: dir).map(\.lastPathComponent), ["Zeta", "Alpha.app", "Beta.app"])
+    }
+}
+
+final class IconTests: XCTestCase {
+    func testTrimmedRemovesTransparentMargin() {
+        // 200×200 transparent, mittig ein deckendes 100×100-Quadrat → nach dem Trimmen bleibt ~die Hälfte der 512 px Rasterbreite.
+        let img = NSImage(size: NSSize(width: 200, height: 200), flipped: false) { _ in
+            NSColor.red.setFill()
+            NSRect(x: 50, y: 50, width: 100, height: 100).fill()
+            return true
+        }
+        let w = img.trimmed().size.width
+        XCTAssertEqual(w, 256, accuracy: 4)
     }
 }
