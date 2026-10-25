@@ -60,12 +60,14 @@ private enum DockItem: CaseIterable {
 struct HomeView: View {
     @EnvironmentObject private var library: GameLibrary
     @EnvironmentObject private var session: GameSession
+    @EnvironmentObject private var builder: GameBuilder
     @AppStorage("darkTheme") private var dark = false
     @State private var onDock = false
-    @State private var gameIndex = 0
+    @State private var gameIndex = 0 // hinter den Spielen: Kachel "Apps hinzufügen", dann "Spiel bauen"
     @State private var dockIndex = 0
     @State private var showSettings = false
     @State private var showBrowser = false
+    @State private var showBuilder = false
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -76,12 +78,16 @@ struct HomeView: View {
                 if showBrowser {
                     FileBrowser { showBrowser = false }.transition(.move(edge: .trailing).combined(with: .opacity))
                 }
+                if showBuilder {
+                    BuilderView { showBuilder = false }.transition(.move(edge: .trailing).combined(with: .opacity))
+                }
             }
             .frame(width: 1280, height: 720)
             .scaleEffect(min(geo.size.width / 1280, geo.size.height / 720))
             .frame(width: geo.size.width, height: geo.size.height)
         }
         .animation(.easeOut(duration: 0.25), value: showBrowser)
+        .animation(.easeOut(duration: 0.25), value: showBuilder)
         .background(Theme.background.ignoresSafeArea())
         .background(WindowAccessor { session.attach($0) })
         .overlay {
@@ -95,7 +101,8 @@ struct HomeView: View {
         .onAppear { focused = true }
         .onChange(of: showSettings) { _, open in if !open { focused = true } }
         .onChange(of: showBrowser) { _, open in if !open { focused = true } }
-        .onChange(of: library.games.count) { _, n in gameIndex = min(gameIndex, max(n - 1, 0)) }
+        .onChange(of: showBuilder) { _, open in if !open { focused = true } }
+        .onChange(of: library.games.count) { _, n in gameIndex = min(gameIndex, n + 1) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in library.reload() }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
             for p in providers {
@@ -106,7 +113,7 @@ struct HomeView: View {
             return true
         }
         .onKeyPress(phases: [.down, .repeat]) { press in
-            guard session.game == nil else { return .handled } // während Start/Spiel keine Menü-Eingaben
+            guard session.game == nil, !showBrowser, !showBuilder else { return .handled } // während Start/Spiel und auf den Seiten darüber keine Menü-Eingaben
             switch press.key {
             case .leftArrow: move(dx: -1)
             case .rightArrow: move(dx: 1)
@@ -153,23 +160,27 @@ struct HomeView: View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
-                    if library.games.isEmpty {
-                        GameTile(game: nil, selected: !onDock).onTapGesture { showBrowser = true }
-                    } else {
-                        ForEach(Array(library.games.enumerated()), id: \.element.id) { i, game in
-                            GameTile(game: game, selected: !onDock && i == gameIndex)
-                                .id(game.id)
-                                .onTapGesture { tapGame(i) }
-                        }
+                    let n = library.games.count
+                    ForEach(Array(library.games.enumerated()), id: \.element.id) { i, game in
+                        GameTile(game: game, selected: !onDock && i == gameIndex)
+                            .id(game.id)
+                            .onTapGesture { tapGame(i) }
                     }
+                    GameTile(game: nil, selected: !onDock && gameIndex == n)
+                        .id("add")
+                        .onTapGesture { tapGame(n) }
+                    GameTile(game: nil, label: builder.running ? "Baut … \(Int(builder.overall * 100)) %" : "Spiel bauen", symbol: "hammer", selected: !onDock && gameIndex == n + 1)
+                        .id("build")
+                        .onTapGesture { tapGame(n + 1) }
                 }
                 .padding(.horizontal, 92)
                 .padding(.vertical, 24) // Platz für Cursor-Glow, den die ScrollView sonst abschneidet
             }
             .frame(height: 340)
             .onChange(of: gameIndex) { _, i in
-                guard library.games.indices.contains(i) else { return }
-                withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(library.games[i].id, anchor: .center) }
+                let games = library.games
+                let id = games.indices.contains(i) ? games[i].id : (i == games.count ? "add" : "build")
+                withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(id, anchor: .center) }
             }
         }
     }
@@ -212,7 +223,7 @@ struct HomeView: View {
         if onDock {
             dockIndex = min(max(dockIndex + dx, 0), DockItem.allCases.count - 1)
         } else {
-            gameIndex = min(max(gameIndex + dx, 0), max(library.games.count - 1, 0))
+            gameIndex = min(max(gameIndex + dx, 0), library.games.count + 1)
         }
     }
 
@@ -231,8 +242,10 @@ struct HomeView: View {
             case .power: NSApp.terminate(nil)
             default: break // shortcut: News/eShop/Album/Controller sind nur Optik
             }
-        } else if library.games.isEmpty {
+        } else if gameIndex == library.games.count {
             showBrowser = true
+        } else if gameIndex > library.games.count {
+            showBuilder = true
         } else {
             session.start(library.games[gameIndex])
         }
@@ -273,9 +286,11 @@ struct Hint: View {
     }
 }
 
-/// `game == nil` ist die leere Kachel, solange noch keine App hinzugefügt wurde.
+/// `game == nil` ist eine Aktionskachel (Standard: "Apps hinzufügen") mit eigenem Symbol und Titel.
 private struct GameTile: View {
     let game: Game?
+    var label = "Apps hinzufügen"
+    var symbol = "plus"
     let selected: Bool
 
     var body: some View {
@@ -285,7 +300,7 @@ private struct GameTile: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
                 .overlay { if selected { Cursor(shape: RoundedRectangle(cornerRadius: 12)) } }
-            Text(game?.title ?? "Apps hinzufügen")
+            Text(game?.title ?? label)
                 .font(.system(size: 20, design: .rounded))
                 .foregroundStyle(Theme.subtle)
                 .lineLimit(1)
@@ -304,7 +319,7 @@ private struct GameTile: View {
         } else {
             ZStack {
                 Theme.dock
-                Image(systemName: "plus").font(.system(size: 64, weight: .light)).foregroundStyle(Theme.subtle)
+                Image(systemName: symbol).font(.system(size: 64, weight: .light)).foregroundStyle(Theme.subtle)
             }
         }
     }

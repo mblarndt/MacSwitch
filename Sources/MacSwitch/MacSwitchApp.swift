@@ -4,6 +4,7 @@ import SwiftUI
 struct MacSwitchApp: App {
     @StateObject private var library = GameLibrary()
     @StateObject private var session = GameSession()
+    @StateObject private var builder = GameBuilder()
 
     var body: some Scene {
         // Window statt WindowGroup: genau ein Fenster, kein ⌘N. Vollbild-Verhalten macht GameSession.home().
@@ -11,6 +12,7 @@ struct MacSwitchApp: App {
             HomeView()
                 .environmentObject(library)
                 .environmentObject(session)
+                .environmentObject(builder)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1280, height: 720)

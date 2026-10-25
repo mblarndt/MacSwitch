@@ -31,6 +31,63 @@ final class LibraryTests: XCTestCase {
 
         XCTAssertEqual(FileBrowser.entries(in: dir).map(\.lastPathComponent), ["Zeta", "Alpha.app", "Beta.app"])
     }
+
+    func testBrowserFileKindListsFoldersThenMatchingFilesIgnoringCase() throws {
+        let dir = try tempDir()
+        try FileManager.default.createDirectory(at: dir.appendingPathComponent("Games"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: dir.appendingPathComponent("Fake.app"), withIntermediateDirectories: true)
+        for file in ["b.NSP", "a.xci", "notes.txt"] { try Data().write(to: dir.appendingPathComponent(file)) }
+
+        let names = FileBrowser.entries(in: dir, kind: .file(GameBuilder.extensions)).map(\.lastPathComponent)
+        XCTAssertEqual(names, ["Games", "a.xci", "b.NSP"])
+        XCTAssertEqual(FileBrowser.entries(in: dir, kind: .folder).map(\.lastPathComponent), ["Games"])
+    }
+}
+
+final class BuilderTests: XCTestCase {
+    func testNameDropsTitleIdAndVersionTags() {
+        let rom = URL(fileURLWithPath: "/x/Super Mario Bros. Wonder [010015100B514000][v0].nsp")
+        XCTAssertEqual(GameBuilder.name(rom), "Super Mario Bros. Wonder")
+        XCTAssertEqual(GameBuilder.name(URL(fileURLWithPath: "/x/Game (EU): Deluxe.xci")), "Game- Deluxe")
+        XCTAssertEqual(GameBuilder.name(URL(fileURLWithPath: "/x/[010015100B514000].nsp")), "Game")
+    }
+
+    /// Ganzer Ablauf mit Attrappen-Skripten statt nxnative: Fortschrittszeilen lesen, danach make_mac_app.py mit dem Startbefehl, dann `done`.
+    func testRunsBuildThenMakeAppAndReportsApp() throws {
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let scripts = tmp.appendingPathComponent("repo/scripts")
+        try FileManager.default.createDirectory(at: scripts, withIntermediateDirectories: true)
+        try """
+        import json, sys
+        assert sys.argv[-2:] == ["--platform", "mac"], sys.argv
+        for e in ({"ev": "stage", "k": 1, "n": 1, "name": "Fake"}, {"ev": "say", "msg": "cd /tmp && DM_ROMFS=x host patched"}):
+            print(json.dumps(e), flush=True)
+        """.write(to: scripts.appendingPathComponent("build_ipa_from_nsp.py"), atomically: true, encoding: .utf8)
+        try """
+        import os, sys
+        assert sys.argv[2] == "Fake Game" and sys.argv[3].startswith("cd /tmp"), sys.argv
+        os.mkdir(sys.argv[1])
+        """.write(to: scripts.appendingPathComponent("make_mac_app.py"), atomically: true, encoding: .utf8)
+        let rom = tmp.appendingPathComponent("Fake Game [0100000000000000][v0].nsp")
+        try Data().write(to: rom)
+
+        let builder = GameBuilder()
+        builder.repo = tmp.appendingPathComponent("repo")
+        builder.rom = rom
+        builder.keys = tmp.appendingPathComponent("prod.keys")
+        builder.out = tmp.appendingPathComponent("out")
+        try FileManager.default.createDirectory(at: builder.out!, withIntermediateDirectories: true)
+        XCTAssertTrue(builder.ready)
+
+        var app: URL?
+        builder.start { app = $0 }
+        let deadline = Date().addingTimeInterval(20)
+        while builder.running && Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.1)) }
+
+        XCTAssertEqual(builder.status, "Fertig", builder.error)
+        XCTAssertEqual(app?.lastPathComponent, "Fake Game.app")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: app?.path ?? ""))
+    }
 }
 
 final class IconTests: XCTestCase {
