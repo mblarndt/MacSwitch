@@ -1,6 +1,6 @@
 # MacSwitch
 
-Native macOS-App (SwiftUI) im Look des Nintendo-Switch-Home-Menüs. IPA-Dateien im Games-Ordner erscheinen als Kacheln.
+Native macOS-App (SwiftUI) im Look des Nintendo-Switch-Home-Menüs. Normale Mac-Apps erscheinen als Kacheln und starten aus dem Menü heraus.
 
 ## Bauen & starten
 
@@ -11,22 +11,21 @@ Voraussetzung: macOS 14+, Xcode bzw. Command Line Tools (Swift 5.9+).
 open build/MacSwitch.app
 ```
 
-## Spiele hinzufügen
+MacSwitch startet im Vollbild (rahmenlos, ohne Dock und Menüleiste). Beenden: Power-Symbol unten rechts oder ⌘Q.
 
-Games-Ordner: `~/Library/Application Support/MacSwitch/Games`
+## Apps hinzufügen
 
-- IPA-Dateien dorthin kopieren, **oder**
-- IPA aufs Fenster ziehen, **oder**
-- Systemeinstellungen (Regler-Symbol unten) → „Spiel hinzufügen…" / „Games-Ordner öffnen".
+- Regler-Symbol unten → „Spiel hinzufügen…" öffnet den Datei-Browser (startet in `/Applications`).
+  ↑ ↓ wählen, → / Enter öffnet Ordner bzw. fügt die App hinzu, ← geht einen Ordner hoch, Esc schließt.
+- Oder eine `.app` aufs Fenster ziehen.
 
-Titel und Icon werden aus der IPA gelesen.
+Hinzugefügt wird als Symlink in `~/Library/Application Support/MacSwitch/Games` (nichts wird kopiert).
+Entfernen: Symlink dort löschen („Games-Ordner öffnen" im Menü).
 
-## Bedienung
+## Spielstart
 
-← → wählen, ↓ / ↑ wechselt zwischen Spielen und Menüleiste, Enter/Leertaste startet, Mausklick geht auch.
+MacSwitch deckt den Bildschirm ab, startet die App im Hintergrund und legt sich erst hinter sie, wenn ihr Fenster da ist.
+Vollbild-Apps wirken dadurch wie Teil von MacSwitch, kleine Fenster liegen auf schwarzem Hintergrund.
+Zurück ins Menü („Home"): ⌘Tab zu MacSwitch, Klick auf den schwarzen Hintergrund oder Spiel beenden.
 
-## Spiele starten
-
-Ein Spiel wird per `open` ans System übergeben. iOS-Apps laufen nur auf Apple-Silicon-Macs, und die IPA muss dafür
-von einer App geöffnet werden können (z. B. [PlayCover](https://playcover.io) als Standard-App für `.ipa`).
-Die App selbst führt keine IPAs aus.
+Mac kann fremde Fenster nicht in ein eigenes Fenster einbetten – die App läuft weiter als eigener Prozess.

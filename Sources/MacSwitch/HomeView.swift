@@ -9,7 +9,7 @@ private func dyn(_ light: UInt32, _ dark: UInt32) -> Color {
     return Color(nsColor: NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? ns(dark) : ns(light) })
 }
 
-private enum Theme {
+enum Theme {
     static let background = LinearGradient(colors: [dyn(0xEBEBEB, 0x303030), dyn(0xE2E2E2, 0x252525)], startPoint: .top, endPoint: .bottom)
     static let text = dyn(0x2D2D2D, 0xFFFFFF)
     static let subtle = dyn(0x6E6E6E, 0xB4B4B4)
@@ -59,28 +59,42 @@ private enum DockItem: CaseIterable {
 
 struct HomeView: View {
     @EnvironmentObject private var library: GameLibrary
+    @EnvironmentObject private var session: GameSession
     @AppStorage("darkTheme") private var dark = false
     @State private var onDock = false
     @State private var gameIndex = 0
     @State private var dockIndex = 0
     @State private var showSettings = false
+    @State private var showBrowser = false
     @FocusState private var focused: Bool
 
     var body: some View {
         // Feste 1280×720-Bühne, die ins Fenster skaliert wird: Proportionen bleiben bei jeder Größe wie auf der Konsole.
         GeometryReader { geo in
-            stage
-                .frame(width: 1280, height: 720)
-                .scaleEffect(min(geo.size.width / 1280, geo.size.height / 720))
-                .frame(width: geo.size.width, height: geo.size.height)
+            ZStack {
+                stage
+                if showBrowser {
+                    FileBrowser { showBrowser = false }.transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+            }
+            .frame(width: 1280, height: 720)
+            .scaleEffect(min(geo.size.width / 1280, geo.size.height / 720))
+            .frame(width: geo.size.width, height: geo.size.height)
         }
+        .animation(.easeOut(duration: 0.25), value: showBrowser)
         .background(Theme.background.ignoresSafeArea())
+        .background(WindowAccessor { session.attach($0) })
+        .overlay {
+            if let game = session.game { LaunchScreen(game: game, spinning: session.isLaunching).transition(.opacity) }
+        }
+        .animation(.easeInOut(duration: 0.35), value: session.game?.id)
         .preferredColorScheme(dark ? .dark : .light)
         .focusable()
         .focused($focused)
         .focusEffectDisabled()
         .onAppear { focused = true }
         .onChange(of: showSettings) { _, open in if !open { focused = true } }
+        .onChange(of: showBrowser) { _, open in if !open { focused = true } }
         .onChange(of: library.games.count) { _, n in gameIndex = min(gameIndex, max(n - 1, 0)) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in library.reload() }
         .onDrop(of: [.fileURL], isTargeted: nil) { providers in
@@ -92,6 +106,7 @@ struct HomeView: View {
             return true
         }
         .onKeyPress(phases: [.down, .repeat]) { press in
+            guard session.game == nil else { return .handled } // während Start/Spiel keine Menü-Eingaben
             switch press.key {
             case .leftArrow: move(dx: -1)
             case .rightArrow: move(dx: 1)
@@ -139,7 +154,7 @@ struct HomeView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     if library.games.isEmpty {
-                        GameTile(game: nil, selected: !onDock).onTapGesture { library.addWithPanel() }
+                        GameTile(game: nil, selected: !onDock).onTapGesture { showBrowser = true }
                     } else {
                         ForEach(Array(library.games.enumerated()), id: \.element.id) { i, game in
                             GameTile(game: game, selected: !onDock && i == gameIndex)
@@ -174,7 +189,7 @@ struct HomeView: View {
 
     private var settingsMenu: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Button("Spiel hinzufügen…") { showSettings = false; library.addWithPanel() }
+            Button("Spiel hinzufügen…") { showSettings = false; showBrowser = true }
             Button("Games-Ordner öffnen") { NSWorkspace.shared.open(GameLibrary.folder) }
             Toggle("Dunkles Design", isOn: $dark)
         }
@@ -186,13 +201,8 @@ struct HomeView: View {
             Rectangle().fill(Theme.line).frame(height: 1)
             HStack {
                 Spacer()
-                Text("A")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .frame(width: 28, height: 28)
-                    .overlay(Circle().strokeBorder(Theme.subtle, lineWidth: 2))
-                Text(onDock ? "OK" : "Starten").font(.system(size: 20, design: .rounded))
+                Hint(key: "A", label: onDock ? "OK" : "Starten")
             }
-            .foregroundStyle(Theme.subtle)
         }
     }
 
@@ -222,9 +232,9 @@ struct HomeView: View {
             default: break // shortcut: News/eShop/Album/Controller sind nur Optik
             }
         } else if library.games.isEmpty {
-            library.addWithPanel()
+            showBrowser = true
         } else {
-            library.launch(library.games[gameIndex])
+            session.start(library.games[gameIndex])
         }
     }
 }
@@ -232,7 +242,7 @@ struct HomeView: View {
 // MARK: - Bausteine
 
 /// Der pulsierende Cursor um die Auswahl.
-private struct Cursor<S: InsettableShape>: View {
+struct Cursor<S: InsettableShape>: View {
     let shape: S
     @State private var bright = false
 
@@ -245,7 +255,25 @@ private struct Cursor<S: InsettableShape>: View {
     }
 }
 
-/// `game == nil` ist die leere Kachel, solange der Games-Ordner leer ist.
+/// Button-Hinweis in der Fußzeile, z. B. ⓐ Starten.
+struct Hint: View {
+    let key: String
+    let label: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(key)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .frame(width: 28, height: 28)
+                .overlay(Circle().strokeBorder(Theme.subtle, lineWidth: 2))
+            Text(label).font(.system(size: 20, design: .rounded))
+        }
+        .foregroundStyle(Theme.subtle)
+        .contentShape(Rectangle())
+    }
+}
+
+/// `game == nil` ist die leere Kachel, solange noch keine App hinzugefügt wurde.
 private struct GameTile: View {
     let game: Game?
     let selected: Bool
@@ -257,7 +285,7 @@ private struct GameTile: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
                 .shadow(color: .black.opacity(0.25), radius: 6, y: 3)
                 .overlay { if selected { Cursor(shape: RoundedRectangle(cornerRadius: 12)) } }
-            Text(game?.title ?? "IPA-Dateien hierher ziehen")
+            Text(game?.title ?? "Apps hinzufügen")
                 .font(.system(size: 20, design: .rounded))
                 .foregroundStyle(Theme.subtle)
                 .lineLimit(1)
@@ -267,15 +295,12 @@ private struct GameTile: View {
     }
 
     @ViewBuilder private var art: some View {
-        if let icon = game?.icon {
-            Image(nsImage: icon).resizable().scaledToFill()
-        } else if let game {
+        if let game {
+            // App-Icons sind transparent und haben Rand → auf farbiger Fläche zentrieren, damit die Kachel wie ein Switch-Cover wirkt.
             let hue = Double(game.title.unicodeScalars.reduce(0) { $0 &+ Int($1.value) } % 360) / 360
             ZStack {
-                LinearGradient(colors: [Color(hue: hue, saturation: 0.55, brightness: 0.95), Color(hue: hue, saturation: 0.75, brightness: 0.70)], startPoint: .top, endPoint: .bottom)
-                Text(String(game.title.prefix(1)).uppercased())
-                    .font(.system(size: 120, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.9))
+                LinearGradient(colors: [Color(hue: hue, saturation: 0.45, brightness: 0.60), Color(hue: hue, saturation: 0.60, brightness: 0.30)], startPoint: .top, endPoint: .bottom)
+                Image(nsImage: game.icon).resizable().scaledToFit().padding(28)
             }
         } else {
             ZStack {
@@ -307,5 +332,27 @@ private struct DockButton: View {
                 .opacity(selected ? 1 : 0)
                 .frame(width: 88) // Label ragt zentriert über die Kachelbreite hinaus, ohne den Abstand zu ändern
         }
+    }
+}
+
+/// Schwarzer Hintergrund, solange die Mac-App startet bzw. läuft. Läuft die App, liegt dieses Fenster hinter ihrem eigenen.
+private struct LaunchScreen: View {
+    let game: Game
+    let spinning: Bool
+
+    var body: some View {
+        VStack(spacing: 40) {
+            Image(nsImage: game.icon).resizable().scaledToFit().frame(width: 220, height: 220)
+            Group {
+                if spinning {
+                    ProgressView().controlSize(.large).environment(\.colorScheme, .dark)
+                } else {
+                    Text(game.title).font(.system(size: 22, design: .rounded)).foregroundStyle(.white.opacity(0.6))
+                }
+            }
+            .frame(height: 40)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black)
     }
 }
