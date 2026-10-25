@@ -55,6 +55,9 @@ Die Spiele lesen die Plätze über einen DSU-Server (cemuhook) auf `127.0.0.1:26
 Der nxnative-Host hat dafür einen DSU-Client (`dm/host/dsu_pad.h`, `front_mac.m`): jedes iPhone ist dort ein Spieler wie ein echter Controller, mit analogen Sticks
 (`DM_DSU=0` schaltet den Client ab). **Spiele müssen dafür einmal neu gebaut werden** („Neu bauen" in den Spiel-Optionen), damit sie den neuen Host enthalten.
 
+- **Das MacSwitch-Menü steuert das iPhone mit dem niedrigsten Platz mit:** Steuerkreuz oder linker Stick wählen (gehalten wiederholt es), **A** bestätigt, **B** geht zurück
+  (Esc), **+** öffnet „Updates & DLC" des gewählten Spiels, **Home** holt MacSwitch nach vorn, auch aus einem laufenden Spiel. Dasselbe gilt in den Seiten
+  (Datei-Browser, Spiel bauen, Optionen, Controller). Im Spiel selbst reagiert das Menü nicht; dort gehen die Eingaben an das Spiel.
 - Beim ersten Einschalten fragt macOS nach der Bluetooth-Berechtigung. Da `build_app.sh` ad-hoc signiert, fragt es nach jedem neuen Build wieder.
 - MacSwitch und der MacHost aus AstrisPhoneController dürfen nicht gleichzeitig laufen (derselbe Port und dieselbe Bluetooth-Kennung); die Seite meldet „Port 26760 ist belegt".
 - Der Host gibt keine Tasten aus und kennt keine Belegungen, nur den Weg über DSU. Die iPhone-App schickt auch nur Switch-Tasten und Sticks.

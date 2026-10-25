@@ -27,6 +27,8 @@ final class ControllerHost: NSObject, ObservableObject, CBPeripheralManagerDeleg
     }
 
     @Published private(set) var snapshot = Snapshot()
+    /// Menü-Tasten vom iPhone (Taste, Wiederholung); wird auf dem Haupt-Thread aufgerufen. Gesetzt von der HomeView.
+    var onMenu: ((MenuPad.Key, Bool) -> Void)?
     @Published var enabled: Bool {
         didSet {
             UserDefaults.standard.set(enabled, forKey: Self.enabledKey)
@@ -41,6 +43,8 @@ final class ControllerHost: NSObject, ObservableObject, CBPeripheralManagerDeleg
     private var presence: CBMutableCharacteristic?
     private var dsu: DSUServer?
     private var advertising = false
+    private var menu = MenuPad() // das iPhone mit dem niedrigsten Platz bedient auch das MacSwitch-Menü
+    private var menuTimer: DispatchWorkItem?
     private var bluetooth = "Bluetooth wird vorbereitet …"
     private var activity: NSObjectProtocol? // verhindert App Nap, solange ein iPhone verbunden ist
 
@@ -96,6 +100,7 @@ final class ControllerHost: NSObject, ObservableObject, CBPeripheralManagerDeleg
             self.dsu?.stop()
             self.dsu = nil
             self.resetPhones()
+            self.driveMenu()
             self.updateActivity()
             self.publish()
         }
@@ -243,10 +248,27 @@ final class ControllerHost: NSObject, ObservableObject, CBPeripheralManagerDeleg
 
     /// Gibt jedem Spielerplatz mit verbundenem iPhone seinen Zustand an die DSU-Clients (Slot = Spieler − 1).
     private func syncDSU() {
+        driveMenu()
         guard let dsu else { return }
         for slot in 0..<Self.playerCount {
             let phone = playerOf.first { $0.value == slot + 1 && subscribers.contains($0.key) }?.key
             dsu.update(slot: slot, state: phone.map { lastStates[$0] ?? .neutral })
+        }
+    }
+
+    /// Das iPhone mit dem niedrigsten Platz bedient das Menü: sein Zustand wird zu Menü-Tasten (MenuPad), gehaltene Richtungen wiederholen sich.
+    private func driveMenu() {
+        let phone = playerOf.filter { subscribers.contains($0.key) }.min { $0.value < $1.value }?.key
+        let now = ProcessInfo.processInfo.systemUptime
+        for (key, isRepeat) in menu.update(phone.flatMap { lastStates[$0] }, now: now) {
+            DispatchQueue.main.async { self.onMenu?(key, isRepeat) }
+        }
+        menuTimer?.cancel()
+        menuTimer = nil
+        if let due = menu.nextRepeat {
+            let item = DispatchWorkItem { [weak self] in self?.driveMenu() }
+            menuTimer = item
+            queue.asyncAfter(deadline: .now() + max(0, due - now), execute: item)
         }
     }
 

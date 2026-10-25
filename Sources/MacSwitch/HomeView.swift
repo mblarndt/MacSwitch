@@ -61,6 +61,7 @@ struct HomeView: View {
     @EnvironmentObject private var library: GameLibrary
     @EnvironmentObject private var session: GameSession
     @EnvironmentObject private var builder: GameBuilder
+    @EnvironmentObject private var controllers: ControllerHost
     @AppStorage("darkTheme") private var dark = false
     @State private var onDock = false
     @State private var gameIndex = 0 // hinter den Spielen: Kachel "Apps hinzufügen", dann "Spiel bauen"
@@ -101,7 +102,7 @@ struct HomeView: View {
         .focusable()
         .focused($focused)
         .focusEffectDisabled()
-        .onAppear { focused = true }
+        .onAppear { focused = true; controllers.onMenu = deliver }
         .onChange(of: showSettings) { _, open in if !open { focused = true } }
         .onChange(of: pages) { _, open in if open == 0 { focused = true } }
         .onChange(of: library.games.count) { _, n in gameIndex = min(gameIndex, n + 1) }
@@ -115,6 +116,13 @@ struct HomeView: View {
             return true
         }
         .onKeyPress(phases: [.down, .repeat], action: handle)
+    }
+
+    /// Menü-Tasten vom iPhone: als Tastenereignis ins Menü, wenn MacSwitch vorn ist; Home holt MacSwitch nach vorn, auch aus einem laufenden Spiel.
+    private func deliver(_ key: MenuPad.Key, isRepeat: Bool) {
+        if key == .home { return session.home() }
+        guard NSApp.isActive, let window = NSApp.keyWindow, let event = key.event(windowNumber: window.windowNumber, isRepeat: isRepeat) else { return }
+        NSApp.postEvent(event, atStart: false)
     }
 
     private func handle(_ press: KeyPress) -> KeyPress.Result {
