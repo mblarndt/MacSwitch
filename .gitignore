@@ -2,3 +2,7 @@
 build/
 .swiftpm/
 .DS_Store
+
+# iPhone-App: von XcodeGen erzeugt (iPhoneController/build_ipa.sh)
+iPhoneController/*.xcodeproj/
+iPhoneController/Info.plist

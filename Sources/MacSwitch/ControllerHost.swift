@@ -1,6 +1,6 @@
 import CoreBluetooth
 
-/// iPhones als Controller: MacSwitch ist der Host der AstrisPad-App (AstrisPhoneController). Das iPhone verbindet sich per Bluetooth LE,
+/// iPhones als Controller: MacSwitch ist der Host der iPhone-App MacSwitch Controller (iPhoneController/; die AstrisPad-App spricht dasselbe Protokoll). Das iPhone verbindet sich per Bluetooth LE,
 /// jedes bekommt einen Spielerplatz (1 bis 4), und die Zustände gehen als DSU-Server (cemuhook) auf 127.0.0.1:26760 an die Spiele:
 /// der nxnative-Host liest sie dort als Spieler mit analogen Sticks (dm/host/dsu_pad.h). Tastaturausgabe, Ziel-App und Belegungen
 /// des MacHost gibt es hier nicht; läuft MacHost selbst, ist der Port belegt und der Status sagt es.
@@ -266,7 +266,7 @@ final class ControllerHost: NSObject, ObservableObject, CBPeripheralManagerDeleg
         if manager == nil {
             s.status = "Aus"
         } else if advertising {
-            s.status = subscribers.isEmpty ? "Bereit – auf dem iPhone AstrisPad öffnen" : subscribers.count == 1 ? "1 iPhone verbunden" : "\(subscribers.count) iPhones verbunden"
+            s.status = subscribers.isEmpty ? "Bereit – auf dem iPhone MacSwitch Controller öffnen" : subscribers.count == 1 ? "1 iPhone verbunden" : "\(subscribers.count) iPhones verbunden"
         } else {
             s.status = bluetooth
         }

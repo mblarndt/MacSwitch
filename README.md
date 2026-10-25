@@ -47,9 +47,9 @@ Y entfernt eine Datei wieder (nur den Link, nie die Datei selbst).
 
 ## iPhone als Controller
 
-Das Dock-Symbol „Controller" öffnet die Seite für den iPhone-Host: A schaltet ihn ein, danach auf dem iPhone die App
-[AstrisPad](../AstrisPhoneController) öffnen (sie verbindet sich per Bluetooth automatisch). Jedes iPhone bekommt einen Spielerplatz (1–4),
-die Seite zeigt Name und Antwortzeit. Ein wiederkehrendes iPhone bekommt seinen Platz zurück; die Wahl „An/Aus" merkt sich MacSwitch.
+Das Dock-Symbol „Controller" öffnet die Seite für den iPhone-Host: A schaltet ihn ein, danach auf dem iPhone die App **MacSwitch Controller** öffnen
+(sie verbindet sich per Bluetooth automatisch). Jedes iPhone bekommt einen Spielerplatz (1–4), die Seite zeigt Name und Antwortzeit. Ein wiederkehrendes
+iPhone bekommt seinen Platz zurück; die Wahl „An/Aus" merkt sich MacSwitch.
 
 Die Spiele lesen die Plätze über einen DSU-Server (cemuhook) auf `127.0.0.1:26760`, den MacSwitch dafür bereitstellt.
 Der nxnative-Host hat dafür einen DSU-Client (`dm/host/dsu_pad.h`, `front_mac.m`): jedes iPhone ist dort ein Spieler wie ein echter Controller, mit analogen Sticks
@@ -57,9 +57,27 @@ Der nxnative-Host hat dafür einen DSU-Client (`dm/host/dsu_pad.h`, `front_mac.m
 
 - Beim ersten Einschalten fragt macOS nach der Bluetooth-Berechtigung. Da `build_app.sh` ad-hoc signiert, fragt es nach jedem neuen Build wieder.
 - MacSwitch und der MacHost aus AstrisPhoneController dürfen nicht gleichzeitig laufen (derselbe Port und dieselbe Bluetooth-Kennung); die Seite meldet „Port 26760 ist belegt".
-- Tastaturausgabe, Ziel-App und Belegungen des MacHost gibt es hier nicht, nur den Weg über DSU. Lautstärketasten und Rückseiten-Tippen des iPhones haben darin keine
-  eigene Taste und kommen nur an, wenn das Layout sie auf eine Switch-Taste legt.
-- Der DSU-Server (`DSUServer.swift`) und der Funk-Teil des Protokolls (`ControllerProtocol.swift`) sind Kopien aus AstrisPhoneController; Änderungen dort bitte hierher übernehmen.
+- Der Host gibt keine Tasten aus und kennt keine Belegungen, nur den Weg über DSU. Die iPhone-App schickt auch nur Switch-Tasten und Sticks.
+- Der DSU-Server (`DSUServer.swift`) ist eine Kopie aus AstrisPhoneController, ebenso der Lese-Teil des Funkprotokolls (`ControllerProtocol.swift`); die Senderseite
+  steht in `iPhoneController/Logic/PadWire.swift`, und `Tests/MacSwitchTests/PadLogicTests.swift` prüft beide gegeneinander.
+
+### iPhone-App „MacSwitch Controller"
+
+Ein Switch-Controller im Querformat: A B X Y, L R ZL ZR, Steuerkreuz, beide Sticks, +, −, Capture, Home und die Stickklicks L3/R3, mit Multitouch
+(mehrere Finger gleichzeitig, von Taste zu Taste rutschen). Mehr gibt es nicht: keine Tastenübersetzung, keine Layouts, keine Maus. Der Stick folgt dem Weg des Fingers
+ab dem Aufsetzen, die Mitte muss man nicht treffen. Oben in der Mitte steht der Verbindungsstatus („Spieler 2 · 24 ms"). Home und Capture gehen mit,
+die Spiele nutzen sie bisher nicht.
+
+IPA bauen (braucht Xcode und `brew install xcodegen`):
+
+```sh
+iPhoneController/build_ipa.sh        # → iPhoneController/build/MacSwitchController.ipa
+iPhoneController/build_ipa.sh sim    # → .app für den iOS-Simulator (nur zum Ansehen, dort gibt es kein Bluetooth)
+```
+
+Die IPA ist unsigniert und läuft ab iOS 16 auf dem iPhone. Zum Sideloaden mit AltStore: die IPA aufs iPhone bringen (AirDrop oder Dateien-App), in AltStore unter „My Apps" mit **+** wählen,
+oder am Mac in AltServer „Sideload .ipa …". AltStore signiert sie mit deiner Apple-ID neu (bei einer kostenlosen Apple-ID läuft die App 7 Tage, dann in AltStore erneuern).
+Beim ersten Start fragt iOS nach der Bluetooth-Berechtigung.
 
 ## Spielstart
 

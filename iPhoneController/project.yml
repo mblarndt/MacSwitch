@@ -1,0 +1,41 @@
+# MacSwitch Controller: die iPhone-App (UIKit, ein Switch-Controller). `build_ipa.sh` erzeugt daraus mit XcodeGen und xcodebuild die IPA.
+# Logic/ ist zugleich das Swift-Package-Target PadLogic (Package.swift im Repository-Wurzelordner), dort wird es getestet.
+name: MacSwitchController
+options:
+  bundleIdPrefix: app.macswitch
+  deploymentTarget:
+    iOS: "16.0"
+targets:
+  MacSwitchController:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Logic
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.macswitch.Controller
+        PRODUCT_NAME: MacSwitchController
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: MacSwitch Controller
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        NSBluetoothAlwaysUsageDescription: MacSwitch Controller verbindet sich per Bluetooth mit MacSwitch auf dem Mac, um die Controller-Eingaben zu senden.
+        UILaunchScreen: {}
+        UIRequiredDeviceCapabilities: [arm64, bluetooth-le]
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).SceneDelegate
