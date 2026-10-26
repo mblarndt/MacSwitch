@@ -46,10 +46,12 @@ final class GameSession: ObservableObject {
         home()
     }
 
-    func start(_ game: Game) {
+    /// `environment`: die Einstellungen des Spiels (GameSettings), die der Host beim Start liest.
+    func start(_ game: Game, environment: [String: String] = [:]) {
         guard case .idle = state else { return }
         state = .launching(game)
         let cfg = NSWorkspace.OpenConfiguration()
+        cfg.environment = environment
         cfg.activates = false // MacSwitch bleibt aktiv → Dock und Menüleiste bleiben versteckt, bis die App ihr Fenster hat
         NSWorkspace.shared.openApplication(at: game.url.resolvingSymlinksInPath(), configuration: cfg) { app, _ in
             DispatchQueue.main.async {

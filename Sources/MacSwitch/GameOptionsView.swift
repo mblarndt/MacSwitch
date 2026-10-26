@@ -4,7 +4,7 @@ import SwiftUI
 /// Das Neu-Bauen zeigt die Builder-Seite, der Lauf gehört wie dort dem GameBuilder.
 struct GameOptionsView: View {
     private enum Field: Hashable {
-        case update, dlc, keys, build, file(URL)
+        case settings, update, dlc, keys, build, file(URL)
     }
 
     @EnvironmentObject private var library: GameLibrary
@@ -16,15 +16,17 @@ struct GameOptionsView: View {
     @State private var index = 0
     @State private var message: String?
     @State private var picking: Field?
+    @State private var showSettings = false
     @FocusState private var focused: Bool
 
     private var work: URL? { GameBuilder.workFolder(of: game) }
-    private var fields: [Field] { [.update, .dlc, .keys, .build] + files.map(Field.file) }
+    /// Einstellungen gibt es für jedes nxnative-Spiel; Update und DLC nur, wo der Arbeitsordner des Spiels neben der App liegt.
+    private var fields: [Field] { [.settings] + (work == nil ? [] : [.update, .dlc, .keys, .build] + files.map(Field.file)) }
 
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                ScreenHeader(symbol: "gearshape.fill", title: game.title, subtitle: "Update und DLC installieren", message: message)
+                ScreenHeader(symbol: "gearshape.fill", title: game.title, subtitle: work == nil ? "Einstellungen" : "Einstellungen, Update und DLC", message: message)
                 list
                 footer
             }
@@ -33,16 +35,21 @@ struct GameOptionsView: View {
                 FileBrowser(kind: field == .keys ? .file(["keys"]) : .file(GameBuilder.extensions), title: title(field), start: startDir(field), choose: { set(field, $0) }) { picking = nil }
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
+            if showSettings {
+                GameSettingsView(game: game) { showSettings = false }.transition(.move(edge: .trailing).combined(with: .opacity))
+            }
         }
         .frame(width: 1280, height: 720)
         .animation(.easeOut(duration: 0.25), value: picking)
+        .animation(.easeOut(duration: 0.25), value: showSettings)
         .focusable()
         .focused($focused)
         .focusEffectDisabled()
         .onAppear { refresh(); focused = true }
         .onChange(of: picking) { _, field in if field == nil { focused = true } }
+        .onChange(of: showSettings) { _, open in if !open { focused = true } }
         .onKeyPress(phases: [.down, .repeat]) { press in
-            guard picking == nil else { return .ignored } // der Datei-Browser hat den Fokus; was er nicht braucht, geht nicht an diese Seite
+            guard picking == nil, !showSettings else { return .ignored } // der Datei-Browser hat den Fokus; was er nicht braucht, geht nicht an diese Seite
             let down = press.phase == .down
             switch press.key {
             case .upArrow: index = max(index - 1, 0)
@@ -94,6 +101,7 @@ struct GameOptionsView: View {
 
     private func label(_ field: Field) -> String {
         switch field {
+        case .settings: "Einstellungen"
         case .update: "Update installieren …"
         case .dlc: "DLC installieren …"
         case .keys: "prod.keys"
@@ -104,6 +112,7 @@ struct GameOptionsView: View {
 
     private func value(_ field: Field) -> String {
         switch field {
+        case .settings: "Bildrate, Auflösung, Konsolenmodus …"
         case .update, .dlc: ""
         case .keys: builder.keys?.path ?? "nicht gewählt"
         case .build:
@@ -151,6 +160,7 @@ struct GameOptionsView: View {
             builder.rebuild(game) { library.add([$0]) }
             showBuild()
         case .file: break
+        case .settings: showSettings = true
         case let field: picking = field
         }
     }

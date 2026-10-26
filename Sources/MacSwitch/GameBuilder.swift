@@ -71,6 +71,11 @@ final class GameBuilder: ObservableObject {
         return FileManager.default.fileExists(atPath: dir.path) ? dir : nil
     }
 
+    /// Eine mit nxnative gebaute App (sie enthält den Host): nur für die gibt es Einstellungen.
+    static func isNxnative(_ game: Game) -> Bool {
+        FileManager.default.fileExists(atPath: game.url.resolvingSymlinksInPath().appendingPathComponent("Contents/Resources/dmhost").path)
+    }
+
     /// Die Spieldateien im Arbeitsordner (Basisspiel, Updates, DLC); die Ordner daneben (<id>_build/) sind Zwischenstände.
     static func installedFiles(in work: URL) -> [URL] {
         let urls = (try? FileManager.default.contentsOfDirectory(at: work, includingPropertiesForKeys: nil)) ?? []

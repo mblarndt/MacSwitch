@@ -79,8 +79,8 @@ struct HomeView: View {
     private var pages: Int { (showBrowser ? 1 : 0) | (showBuilder ? 2 : 0) | (showControllers ? 4 : 0) | (optionsGame == nil ? 0 : 8) }
 
     private var selectedGame: Game? { !onDock && library.games.indices.contains(gameIndex) ? library.games[gameIndex] : nil }
-    /// Updates und DLC gibt es nur für Spiele, die mit nxnative gebaut wurden (Arbeitsordner neben der App).
-    private var hasOptions: Bool { selectedGame.map { GameBuilder.workFolder(of: $0) != nil } ?? false }
+    /// Einstellungen (und Updates und DLC) gibt es nur für Spiele, die mit nxnative gebaut wurden.
+    private var hasOptions: Bool { selectedGame.map(GameBuilder.isNxnative) ?? false }
 
     var body: some View {
         // Feste 1280×720-Bühne, die ins Fenster skaliert wird: Proportionen bleiben bei jeder Größe wie auf der Konsole.
@@ -263,7 +263,7 @@ struct HomeView: View {
             Rectangle().fill(Theme.line).frame(height: 1)
             HStack(spacing: 36) {
                 Spacer()
-                if hasOptions { Hint(key: "+", label: "Updates & DLC").onTapGesture { openOptions() } }
+                if hasOptions { Hint(key: "+", label: "Optionen").onTapGesture { openOptions() } }
                 Hint(key: "A", label: onDock ? "OK" : selectedGame == nil ? "Öffnen" : "Starten")
             }
         }
@@ -304,7 +304,8 @@ struct HomeView: View {
         } else if gameIndex > library.games.count {
             showBuilder = true
         } else {
-            session.start(library.games[gameIndex])
+            let game = library.games[gameIndex]
+            session.start(game, environment: GameSettingsStore.values(for: game.url.lastPathComponent))
         }
     }
 }

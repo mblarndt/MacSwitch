@@ -45,6 +45,18 @@ und zeigt dann oben im Menü „nxnative: N neue Änderungen" (anklicken öffnet
 unverändert und die Zeile nennt den Grund (dann im Ordner committen oder im Terminal aktualisieren). Lokale Änderungen an anderen Dateien bleiben erhalten.
 Gebaute Spiele übernehmen die Änderungen erst mit „Neu bauen". Ohne Netz oder ohne Git-Ordner passiert beim Start nichts.
 
+### Einstellungen pro Spiel
+
+Bei jedem mit nxnative gebauten Spiel öffnet `+` (oder Controller-Menütaste) die **Optionen**, deren erste Zeile **Einstellungen** ist: Bildrate (30/60), Renderauflösung, Konsolenmodus
+(Docked/Handheld), Hochskalierung (MetalFX), Bildraten-Anzeige, Vibration und Stärke, und unter „Leistung" Bildpufferung, Metal-4-Pipelines, Pipelines vorab bauen, Encode-Thread,
+Bilder bei Verspätung halten und das Metal-HUD. Das sind die Einstellungen aus `dm/games/settings.tsv` (nxnative-`docs/settings.md` erklärt jede). ← → ändern, A schaltet weiter,
+Y setzt eine Einstellung zurück. Welche es gibt und was ihr Standard ist, liest MacSwitch aus dem Profil des Spiels (`dm/games/<Title-ID>/game.tsv` im nxnative-Ordner) und der App.
+Die Spielsprache fehlt (sie ist beim Bauen festgelegt).
+
+Gespeichert wird nur, was vom Standard abweicht (`~/Library/Application Support/MacSwitch/settings.json`); MacSwitch gibt es beim Start des Spiels als Umgebungsvariablen mit (`DM_FPS_TARGET`,
+`DM_OPMODE` …), die der Host liest. Ein Neubau ist nicht nötig, die Einstellungen gelten ab dem nächsten Start des Spiels (nicht für ein schon laufendes).
+Ob der Host im Spiel eine Variable kennt, hängt vom Stand von nxnative ab; eine unbekannte wird ignoriert.
+
 ### Update oder DLC nachinstallieren
 
 Bei Spielen, die mit nxnative gebaut wurden, erscheint in der Fußzeile „+ Updates & DLC" (Taste `+` oder anklicken).
