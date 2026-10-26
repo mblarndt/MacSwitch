@@ -20,6 +20,7 @@ final class NxnativeUpdaterTests: XCTestCase {
         git(origin, "add", "."); git(origin, "commit", "-q", "-m", "eins")
         let r = NxnativeUpdater.git(["clone", "-q", origin.path, clone.path], in: tmp)
         XCTAssertEqual(r.status, 0, r.output)
+        git(clone, "config", "user.name", "t"); git(clone, "config", "user.email", "t@t")
         return (origin, clone)
     }
 
@@ -51,13 +52,30 @@ final class NxnativeUpdaterTests: XCTestCase {
         XCTAssertEqual(try read(clone, "a.txt"), "meine Fassung", "geprüft, nichts verändert")
     }
 
-    func testOwnCommitsBlockAndNonGitFolderFails() throws {
+    func testOwnCommitsAreMergedWithUpstream() throws {
         let (origin, clone) = try setup()
         try write(clone, "c.txt", "mein Commit"); git(clone, "add", "."); git(clone, "commit", "-q", "-m", "lokal")
         try write(origin, "a.txt", "a2"); git(origin, "commit", "-q", "-am", "zwei")
-        guard case .behind(_, _, let blocker) = NxnativeUpdater.check(repo: clone) else { return XCTFail() }
-        XCTAssertTrue(blocker?.contains("eigene Commits") == true, blocker ?? "")
+        guard case .behind(1, _, let blocker) = NxnativeUpdater.check(repo: clone) else { return XCTFail("müsste 1 zurückliegen") }
+        XCTAssertNil(blocker, "eigene Commits sind kein Hindernis mehr")
+        XCTAssertEqual(NxnativeUpdater.update(repo: clone), .updated)
+        XCTAssertEqual(try read(clone, "a.txt"), "a2")
+        XCTAssertEqual(try read(clone, "c.txt"), "mein Commit", "der eigene Commit bleibt")
+        XCTAssertEqual(NxnativeUpdater.check(repo: clone), .current)
+    }
 
+    func testMergeConflictIsRolledBackAndReported() throws {
+        let (origin, clone) = try setup()
+        try write(clone, "a.txt", "meine Fassung"); git(clone, "commit", "-q", "-am", "lokal")
+        try write(origin, "a.txt", "andere Fassung"); git(origin, "commit", "-q", "-am", "zwei")
+        guard case .behind = NxnativeUpdater.check(repo: clone) else { return XCTFail() }
+        guard case .failed(let message) = NxnativeUpdater.update(repo: clone) else { return XCTFail("müsste scheitern") }
+        XCTAssertTrue(message.contains("Konflikte in a.txt"), message)
+        XCTAssertEqual(try read(clone, "a.txt"), "meine Fassung", "zurückgenommen: alles wie vorher")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: clone.appendingPathComponent(".git/MERGE_HEAD").path), "kein halber Merge")
+    }
+
+    func testNonGitFolderFails() throws {
         let plain = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: plain, withIntermediateDirectories: true)
         XCTAssertEqual(NxnativeUpdater.check(repo: plain), .failed("kein Git-Ordner"))

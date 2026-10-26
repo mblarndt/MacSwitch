@@ -1,8 +1,9 @@
 import Foundation
 
 /// Hält den nxnative-Ordner auf dem Stand des offiziellen Repositories: nxnative hat keine Releases, es kommen laufend Änderungen.
-/// Prüft per `git fetch`, ob der Upstream-Zweig neuer ist, und aktualisiert per `git pull --ff-only`. Verändert wird nur, wenn das gefahrlos geht:
-/// keine eigenen Commits und keine lokalen Änderungen an Dateien, die auch das Update ändert (sonst bleibt alles, wie es ist, und der Status sagt warum).
+/// Prüft per `git fetch`, ob der Upstream-Zweig (`@{u}`, bei einem Fork der offizielle Zweig) neuer ist, und aktualisiert: ohne eigene Commits per `git pull --ff-only`, mit eigenen
+/// per `git merge` (ein Konflikt macht den Merge rückgängig und bleibt gemeldet). Verändert wird nur, wenn das gefahrlos geht:
+/// keine lokalen Änderungen an Dateien, die auch das Update ändert (sonst bleibt alles, wie es ist, und der Status sagt warum).
 /// Gebaute Spiele übernehmen Änderungen erst mit „Neu bauen“.
 final class NxnativeUpdater: ObservableObject {
     enum State: Equatable {
@@ -65,8 +66,6 @@ final class NxnativeUpdater: ObservableObject {
         guard let behind = Int(git(["rev-list", "--count", "HEAD..\(up.output)"], in: repo).output) else { return .failed("Vergleich fehlgeschlagen") }
         if behind == 0 { return .current }
         let when = git(["log", "-1", "--format=%cr", up.output], in: repo).output
-        let ahead = Int(git(["rev-list", "--count", "\(up.output)..HEAD"], in: repo).output) ?? 0
-        if ahead > 0 { return .behind(count: behind, when: when, blocker: "\(ahead) eigene Commits: im Terminal aktualisieren") }
         // Lokale Änderungen an Dateien, die das Update ebenfalls ändert, würden beim Einspielen kollidieren.
         func names(_ args: [String]) -> Set<String> { Set(git(args, in: repo).output.split(separator: "\n").map(String.init)) }
         let clash = names(["diff", "--name-only", "HEAD..\(up.output)"]).intersection(names(["diff", "--name-only", "HEAD"])).sorted()
@@ -74,11 +73,22 @@ final class NxnativeUpdater: ObservableObject {
         return .behind(count: behind, when: when, blocker: blocker)
     }
 
-    /// Spielt die neuen Commits ein. Lokale Änderungen an anderen Dateien bleiben (autostash).
+    /// Spielt die neuen Commits ein: ohne eigene Commits als Vorspulen, mit eigenen als Merge. Lokale Änderungen an anderen Dateien bleiben erhalten (autostash).
     static func update(repo: URL) -> State {
-        let pull = git(["pull", "--ff-only", "--autostash", "--quiet"], in: repo, timeout: 180)
-        guard pull.status == 0 else { return .failed(pull.output.split(separator: "\n").last.map(String.init) ?? "Update fehlgeschlagen") }
-        return .updated
+        let ahead = Int(git(["rev-list", "--count", "@{u}..HEAD"], in: repo).output) ?? 0
+        if ahead == 0 {
+            let pull = git(["pull", "--ff-only", "--autostash", "--quiet"], in: repo, timeout: 180)
+            guard pull.status == 0 else { return .failed(pull.output.split(separator: "\n").last.map(String.init) ?? "Update fehlgeschlagen") }
+            return .updated
+        }
+        // Eigene Commits: Upstream einmergen. Ohne eingerichteten Git-Namen bekommt der Merge-Commit einen Ersatz.
+        let identity = git(["config", "user.name"], in: repo).status == 0 ? [] : ["-c", "user.name=MacSwitch", "-c", "user.email=macswitch@localhost"]
+        let merge = git(identity + ["merge", "--no-edit", "--autostash", "--quiet", "@{u}"], in: repo, timeout: 180)
+        guard merge.status != 0 else { return .updated }
+        let conflicts = git(["diff", "--name-only", "--diff-filter=U"], in: repo).output.split(separator: "\n").map { ($0 as NSString).lastPathComponent }
+        _ = git(["merge", "--abort"], in: repo) // zurück auf den Stand davor
+        if conflicts.isEmpty { return .failed(merge.output.split(separator: "\n").last.map(String.init) ?? "Merge fehlgeschlagen") }
+        return .failed("Konflikte in \(conflicts.prefix(3).joined(separator: ", ")): im Terminal zusammenführen")
     }
 
     /// Text für die Anzeige.
