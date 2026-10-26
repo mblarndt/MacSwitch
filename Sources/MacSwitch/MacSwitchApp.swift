@@ -7,6 +7,7 @@ struct MacSwitchApp: App {
     @StateObject private var builder = GameBuilder()
     @StateObject private var controllers = ControllerHost()
     @StateObject private var pads = PhysicalPads()
+    @StateObject private var updater = NxnativeUpdater()
 
     var body: some Scene {
         // Window statt WindowGroup: genau ein Fenster, kein ⌘N. Vollbild-Verhalten macht GameSession.home().
@@ -17,6 +18,7 @@ struct MacSwitchApp: App {
                 .environmentObject(builder)
                 .environmentObject(controllers)
                 .environmentObject(pads)
+                .environmentObject(updater)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1280, height: 720)

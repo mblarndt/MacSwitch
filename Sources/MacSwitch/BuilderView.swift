@@ -4,17 +4,18 @@ import SwiftUI
 /// Der Lauf gehört dem GameBuilder und geht weiter, wenn man diese Seite schließt.
 struct BuilderView: View {
     private enum Field: Hashable {
-        case repo, rom, update, dlc(URL), addDlc, keys, out, start
+        case repo, nxUpdate, rom, update, dlc(URL), addDlc, keys, out, start
     }
 
     @EnvironmentObject private var library: GameLibrary
     @EnvironmentObject private var builder: GameBuilder
+    @EnvironmentObject private var updater: NxnativeUpdater
     let close: () -> Void
     @State private var index = 0
     @State private var picking: Field?
     @FocusState private var focused: Bool
 
-    private var fields: [Field] { [.repo, .rom, .update] + builder.dlcs.map(Field.dlc) + [.addDlc, .keys, .out, .start] }
+    private var fields: [Field] { [.repo, .nxUpdate, .rom, .update] + builder.dlcs.map(Field.dlc) + [.addDlc, .keys, .out, .start] }
     private var showsRun: Bool { !builder.status.isEmpty }
 
     var body: some View {
@@ -103,6 +104,7 @@ struct BuilderView: View {
     private func label(_ field: Field) -> String {
         switch field {
         case .repo: "nxnative-Ordner"
+        case .nxUpdate: "nxnative aktualisieren"
         case .rom: "Hauptspiel"
         case .update: "Update (optional)"
         case .dlc: "DLC"
@@ -122,6 +124,7 @@ struct BuilderView: View {
         case .dlc(let url): return url.lastPathComponent
         case .keys: return builder.keys?.path ?? none
         case .out: return builder.out?.path ?? none
+        case .nxUpdate: return updater.summary
         case .addDlc, .start: return ""
         }
     }
@@ -156,13 +159,14 @@ struct BuilderView: View {
         case .addDlc: if !builder.dlcs.contains(url) { builder.dlcs.append(url) }
         case .keys: builder.keys = url
         case .out: builder.out = url
-        case .dlc, .start: break
+        case .dlc, .start, .nxUpdate: break
         }
     }
 
     private func activate() {
         switch fields[index] {
         case .start: if builder.ready { builder.start { library.add([$0]) } }
+        case .nxUpdate: if updater.state.updatable { updater.update(repo: builder.repo) } else { updater.check(repo: builder.repo) }
         case .dlc(let url): remove(.dlc(url))
         case let field: picking = field
         }
@@ -231,6 +235,7 @@ struct BuilderView: View {
     private var actionLabel: String {
         switch fields[index] {
         case .start: "Bauen"
+        case .nxUpdate: updater.state.updatable ? "Aktualisieren" : "Prüfen"
         case .dlc: "Entfernen"
         default: "Wählen"
         }

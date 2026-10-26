@@ -37,6 +37,14 @@ Esc blendet sie aus (der Build läuft weiter, die Kachel zeigt den Stand), X bri
 - Die Dateien werden nur verlinkt, Zwischenergebnisse liegen in `<Ausgabe>/NxNative-Work/<Spielname>/` (ein zweiter Build geht schneller; danach löschbar).
 - Der erste Build braucht 30–60 Minuten und etwa das Doppelte der NSP-Größe plus 10 GB frei.
 
+### nxnative aktuell halten
+
+nxnative hat keine Releases, im Repository kommen laufend Änderungen. MacSwitch prüft beim Start einmal im Hintergrund (`git fetch` im nxnative-Ordner), ob der Upstream-Zweig neuer ist,
+und zeigt dann oben im Menü „nxnative: N neue Änderungen" (anklicken öffnet „Spiel bauen"). Dort aktualisiert die Zeile **nxnative aktualisieren** per `git pull --ff-only --autostash`
+(A; ohne Neues prüft sie erneut). Das Update läuft nur, wenn es gefahrlos geht: Hat man eigene Commits oder lokale Änderungen an Dateien, die das Update ebenfalls ändert, bleibt alles
+unverändert und die Zeile nennt den Grund (dann im Ordner committen oder im Terminal aktualisieren). Lokale Änderungen an anderen Dateien bleiben erhalten.
+Gebaute Spiele übernehmen die Änderungen erst mit „Neu bauen". Ohne Netz oder ohne Git-Ordner passiert beim Start nichts.
+
 ### Update oder DLC nachinstallieren
 
 Bei Spielen, die mit nxnative gebaut wurden, erscheint in der Fußzeile „+ Updates & DLC" (Taste `+` oder anklicken).

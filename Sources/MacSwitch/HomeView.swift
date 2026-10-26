@@ -61,6 +61,7 @@ struct HomeView: View {
     @EnvironmentObject private var library: GameLibrary
     @EnvironmentObject private var session: GameSession
     @EnvironmentObject private var builder: GameBuilder
+    @EnvironmentObject private var updater: NxnativeUpdater
     @EnvironmentObject private var controllers: ControllerHost
     @EnvironmentObject private var pads: PhysicalPads
     @AppStorage("darkTheme") private var dark = false
@@ -103,7 +104,7 @@ struct HomeView: View {
         .focusable()
         .focused($focused)
         .focusEffectDisabled()
-        .onAppear { focused = true; controllers.onMenu = deliver; pads.onMenu = deliver }
+        .onAppear { focused = true; controllers.onMenu = deliver; pads.onMenu = deliver; updater.check(repo: builder.repo) }
         .onChange(of: showSettings) { _, open in if !open { focused = true } }
         .onChange(of: pages) { _, open in if open == 0 { focused = true } }
         .onChange(of: library.games.count) { _, n in gameIndex = min(gameIndex, n + 1) }
@@ -168,6 +169,24 @@ struct HomeView: View {
         }
     }
 
+    /// Hinweis, wenn das offizielle nxnative-Repository Neues hat (Prüfung beim Start); ein Klick öffnet „Spiel bauen“, wo man aktualisiert.
+    @ViewBuilder private var updateBadge: some View {
+        switch updater.state {
+        case .behind(let count, _, _): badge("nxnative: \(count) neue Änderung\(count == 1 ? "" : "en")")
+        case .updated: badge("nxnative aktualisiert – Spiele neu bauen")
+        default: EmptyView()
+        }
+    }
+
+    private func badge(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 18, weight: .medium, design: .rounded))
+            .foregroundStyle(Theme.cursor)
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .background(Capsule().fill(Theme.dock))
+            .onTapGesture { showBuilder = true }
+    }
+
     private var topBar: some View {
         HStack(spacing: 18) {
             Circle()
@@ -175,6 +194,7 @@ struct HomeView: View {
                 .frame(width: 56, height: 56)
                 .overlay(Image(systemName: "person.fill").font(.system(size: 28)).foregroundStyle(.white))
                 .overlay(Circle().strokeBorder(.white, lineWidth: 3))
+            updateBadge
             Spacer()
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
                 Text(ctx.date.formatted(date: .omitted, time: .shortened))
