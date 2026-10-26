@@ -68,7 +68,7 @@ Der nxnative-Host hat dafür einen DSU-Client (`dm/host/dsu_pad.h`, `front_mac.m
 
 Ein Controller am Mac (Bluetooth oder USB-Kabel; Xbox: Pairing-Taste oben etwa 3 s halten, dann in Systemeinstellungen → Bluetooth verbinden) bedient das MacSwitch-Menü
 wie das iPhone: Steuerkreuz oder linker Stick wählen, die rechte Fläche (Xbox B, die Switch-„A"-Position) bestätigt, die untere (Xbox A) geht zurück, Menü (+) öffnet
-„Updates & DLC", Home (Guide-Knopf) holt MacSwitch nach vorn, auch aus einem laufenden Spiel. Die Controller-Seite zeigt die verbundenen Controller.
+„Updates & DLC", Home (Guide-Knopf) holt MacSwitch nach vorn, auch aus einem laufenden Spiel. Die Controller-Seite zeigt iPhones und Controller als Spieler 1, 2, … in der Reihenfolge, in der sie sich verbunden haben (der erste ist Spieler 1); die Liste scrollt.
 
 In den Spielen liest der nxnative-Host die Controller selbst; jeder ist dort ein Spieler (bis 8), die Tasten gelten nach Lage wie auf der Switch.
 Controller dürfen jederzeit, auch im laufenden Spiel, dazukommen oder wegfallen: Ein Spiel für einen Spieler bekommt alle Controller (und das iPhone) zugleich als Spieler 1, man greift also

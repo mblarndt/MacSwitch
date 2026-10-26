@@ -16,6 +16,7 @@ final class ControllerHost: NSObject, ObservableObject, CBPeripheralManagerDeleg
         var name: String? // das iPhone, das hier sitzt oder zuletzt saß
         var connected = false
         var latency: Int? // Antwortzeit hin und zurück in ms, vom iPhone gemessen
+        var since: Date? // seit wann das iPhone verbunden ist
         var id: Int { number }
     }
 
@@ -49,6 +50,7 @@ final class ControllerHost: NSObject, ObservableObject, CBPeripheralManagerDeleg
     private var activity: NSObjectProtocol? // verhindert App Nap, solange ein iPhone verbunden ist
 
     private var subscribers = Set<UUID>()
+    private var connectedAt = [UUID: Date]()
     private var centrals = [UUID: CBCentral]()
     private var deviceOf = [UUID: String]() // Geräte-ID aus dem Hello
     private var playerOf = [UUID: Int]()
@@ -107,7 +109,7 @@ final class ControllerHost: NSObject, ObservableObject, CBPeripheralManagerDeleg
     }
 
     private func resetPhones() {
-        subscribers.removeAll(); centrals.removeAll(); deviceOf.removeAll(); playerOf.removeAll()
+        subscribers.removeAll(); connectedAt.removeAll(); centrals.removeAll(); deviceOf.removeAll(); playerOf.removeAll()
         assigned.removeAll(); lastStates.removeAll(); roundTrips.removeAll(); pendingNotices.removeAll()
     }
 
@@ -147,6 +149,7 @@ final class ControllerHost: NSObject, ObservableObject, CBPeripheralManagerDeleg
     func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didSubscribeTo characteristic: CBCharacteristic) {
         guard characteristic.uuid == presenceID else { return }
         subscribers.insert(central.identifier)
+        connectedAt[central.identifier] = Date()
         centrals[central.identifier] = central
         peripheral.setDesiredConnectionLatency(.low, for: central) // kürzeres Funkintervall; das iPhone muss nicht zustimmen
         if assigned.contains(central.identifier) { notifyPlayer(central.identifier) } // kam das Hello vor dem Abo, erfährt das iPhone seinen Platz erst jetzt
@@ -158,6 +161,7 @@ final class ControllerHost: NSObject, ObservableObject, CBPeripheralManagerDeleg
         guard characteristic.uuid == presenceID else { return }
         let phone = central.identifier
         subscribers.remove(phone)
+        connectedAt[phone] = nil
         playerOf[phone] = nil; deviceOf[phone] = nil; roundTrips[phone] = nil; lastStates[phone] = nil; centrals[phone] = nil
         assigned.remove(phone); pendingNotices.remove(phone)
         syncDSU()
@@ -285,7 +289,7 @@ final class ControllerHost: NSObject, ObservableObject, CBPeripheralManagerDeleg
             let phone = playerOf.first { $0.value == n && subscribers.contains($0.key) }?.key
             let device = phone.flatMap { deviceOf[$0] } ?? savedPlayers.first { $0.value == n }?.key
             s.players[n - 1] = Player(number: n, name: phone != nil ? (device.flatMap { deviceNames[$0] } ?? "iPhone") : device.flatMap { deviceNames[$0] },
-                                      connected: phone != nil, latency: phone.flatMap { roundTrips[$0] })
+                                      connected: phone != nil, latency: phone.flatMap { roundTrips[$0] }, since: phone.flatMap { connectedAt[$0] })
         }
         s.waiting = assigned.filter { playerOf[$0] == nil }.count
         s.dsu = dsu.map { $0.isRunning ? "127.0.0.1:\(DSUServer.port) · \($0.clientCount) Spiel(e) verbunden" : ($0.error ?? "gestoppt") } ?? "aus"

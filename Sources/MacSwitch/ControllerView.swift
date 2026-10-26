@@ -10,7 +10,16 @@ struct ControllerView: View {
     @State private var confirmOff: Date? // bis wann ein zweites A das Ausschalten bestätigt
     @FocusState private var focused: Bool
 
-    private var rows: Int { 1 + ControllerHost.playerCount + 1 + max(pads.names.count, 1) } // Schalter, Spieler, Spiele-Anbindung, echte Controller
+    /// Wer auf welchem Platz sitzt: iPhones und Controller in der Reihenfolge, in der sie sich verbunden haben (der erste ist Spieler 1).
+    static func seats(phones: [ControllerHost.Player], pads: [PhysicalPads.Device]) -> [(name: String, detail: String)] {
+        let all = phones.filter(\.connected).map { (name: $0.name ?? "iPhone", detail: $0.latency.map { "\($0) ms" } ?? "iPhone", since: $0.since ?? .distantPast) }
+            + pads.map { (name: $0.name, detail: "Controller", since: $0.since) }
+        return all.enumerated().sorted { ($0.element.since, $0.offset) < ($1.element.since, $1.offset) }.map { (name: $0.element.name, detail: $0.element.detail) }
+    }
+
+    private var seats: [(name: String, detail: String)] { Self.seats(phones: host.snapshot.players, pads: pads.devices) }
+    private var playerRows: Int { max(ControllerHost.playerCount, seats.count) }
+    private var rows: Int { 1 + playerRows + 1 } // Schalter, Spieler, Spiele-Anbindung
 
     var body: some View {
         VStack(spacing: 0) {
@@ -38,14 +47,18 @@ struct ControllerView: View {
     }
 
     private var list: some View {
-        VStack(spacing: 16) {
-            ForEach(0..<rows, id: \.self) { i in
-                row(label(i), value(i), selected: i == index).onTapGesture { if i == index { activate() } else { index = i } }
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 16) {
+                    ForEach(0..<rows, id: \.self) { i in
+                        row(label(i), value(i), selected: i == index).id(i).onTapGesture { if i == index { activate() } else { index = i } }
+                    }
+                }
+                .padding(.horizontal, 140)
+                .padding(.vertical, 24)
             }
-            Spacer()
+            .onChange(of: index) { _, i in withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(i, anchor: .center) } }
         }
-        .padding(.horizontal, 140)
-        .padding(.vertical, 24)
     }
 
     private func row(_ label: String, _ value: String, selected: Bool) -> some View {
@@ -58,20 +71,13 @@ struct ControllerView: View {
     }
 
     private func label(_ i: Int) -> String {
-        let n = ControllerHost.playerCount
-        if i == 0 { return "iPhone-Controller" }
-        if i <= n { return "Spieler \(i)" }
-        if i == n + 1 { return "Anbindung für Spiele" }
-        return pads.names.indices.contains(i - n - 2) ? pads.names[i - n - 2] : "Controller (Bluetooth oder Kabel)"
+        i == 0 ? "iPhone-Controller" : i <= playerRows ? "Spieler \(i)" : "Anbindung für Spiele"
     }
 
     private func value(_ i: Int) -> String {
         if i == 0 { return confirmOff != nil ? "A noch einmal: das iPhone trennt sich" : host.enabled ? "An" : "Aus" }
-        if i == ControllerHost.playerCount + 1 { return host.snapshot.dsu }
-        if i > ControllerHost.playerCount + 1 { return pads.names.isEmpty ? "keiner verbunden" : "verbunden" }
-        let p = host.snapshot.players[i - 1]
-        guard let name = p.name else { return "frei" }
-        return p.connected ? name + (p.latency.map { " · \($0) ms" } ?? "") : "\(name) (getrennt)"
+        if i > playerRows { return host.snapshot.dsu }
+        return seats.indices.contains(i - 1) ? "\(seats[i - 1].name) · \(seats[i - 1].detail)" : "frei"
     }
 
     /// Ein iPhone, das am Host hängt, steuert diese Seite selbst: Ausschalten trennt es und ließe es ohne Kontrolle. Darum braucht es dann ein zweites A.

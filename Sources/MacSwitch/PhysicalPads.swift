@@ -49,7 +49,14 @@ extension GamepadState {
 /// Echte Controller am Mac (Bluetooth oder Kabel): bedienen das MacSwitch-Menü wie das iPhone (MenuPad) und erscheinen auf der Controller-Seite.
 /// In den Spielen liest sie der nxnative-Host selbst (jeder Controller ein Spieler); hier geht es nur um das Menü.
 final class PhysicalPads: ObservableObject {
-    @Published private(set) var names = [String]()
+    struct Device: Equatable {
+        let name: String
+        let since: Date
+    }
+
+    /// Die verbundenen Controller mit dem Zeitpunkt, seit dem sie verbunden sind (beim Start des Programms schon verbundene: mit dem Start).
+    @Published private(set) var devices = [Device]()
+    private var since = [ObjectIdentifier: Date]()
     /// Menü-Tasten (Taste, Wiederholung) auf dem Haupt-Thread. Gesetzt von der HomeView.
     var onMenu: ((MenuPad.Key, Bool) -> Void)?
     private lazy var driver = MenuDriver(queue: .main) { [weak self] key, isRepeat in self?.onMenu?(key, isRepeat) }
@@ -66,8 +73,10 @@ final class PhysicalPads: ObservableObject {
     private func pads() -> [GCController] { GCController.controllers().filter { $0.extendedGamepad != nil } }
 
     private func refresh() {
-        let all = pads()
-        names = all.map { $0.vendorName ?? "Controller" }
+        let all = pads(), now = Date()
+        for pad in all where since[ObjectIdentifier(pad)] == nil { since[ObjectIdentifier(pad)] = now }
+        since = since.filter { key, _ in all.contains { ObjectIdentifier($0) == key } }
+        devices = all.map { Device(name: $0.vendorName ?? "Controller", since: since[ObjectIdentifier($0)] ?? now) }
         for pad in all {
             pad.extendedGamepad?.valueChangedHandler = { [weak self] _, _ in self?.changed() }
             pad.extendedGamepad?.buttonHome?.preferredSystemGestureState = .disabled // der Home-Knopf gehört MacSwitch, nicht dem System

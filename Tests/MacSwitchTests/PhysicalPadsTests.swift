@@ -63,3 +63,23 @@ final class PhysicalPadsTests: XCTestCase {
         XCTAssertEqual(keys, seen, "nach dem Loslassen kommt nichts mehr")
     }
 }
+
+final class ControllerSeatsTests: XCTestCase {
+    func testSeatsFollowTheOrderOfConnecting() {
+        let t = Date(timeIntervalSince1970: 1000)
+        let xbox = PhysicalPads.Device(name: "Xbox Wireless Controller", since: t)
+        var phone = ControllerHost.Player(number: 1, name: "Bens iPhone", connected: true, latency: 24, since: t.addingTimeInterval(5))
+        var seats = ControllerView.seats(phones: [phone], pads: [xbox])
+        XCTAssertEqual(seats.map(\.name), ["Xbox Wireless Controller", "Bens iPhone"], "der Xbox-Controller war zuerst da: Spieler 1")
+        XCTAssertEqual(seats.map(\.detail), ["Controller", "24 ms"])
+
+        phone.since = t.addingTimeInterval(-5)
+        seats = ControllerView.seats(phones: [phone], pads: [xbox])
+        XCTAssertEqual(seats.map(\.name), ["Bens iPhone", "Xbox Wireless Controller"], "war das iPhone zuerst, ist es Spieler 1")
+
+        phone.connected = false
+        XCTAssertEqual(ControllerView.seats(phones: [phone], pads: [xbox]).map(\.name), ["Xbox Wireless Controller"], "nicht verbundene iPhones belegen keinen Platz")
+        let twin = PhysicalPads.Device(name: "Pro Controller", since: t)
+        XCTAssertEqual(ControllerView.seats(phones: [], pads: [xbox, twin]).map(\.name), ["Xbox Wireless Controller", "Pro Controller"], "gleiche Zeit: Reihenfolge bleibt")
+    }
+}
