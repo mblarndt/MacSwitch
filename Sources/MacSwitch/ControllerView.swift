@@ -6,6 +6,7 @@ struct ControllerView: View {
     @EnvironmentObject private var host: ControllerHost
     let close: () -> Void
     @State private var index = 0
+    @State private var confirmOff: Date? // bis wann ein zweites A das Ausschalten bestätigt
     @FocusState private var focused: Bool
 
     private var rows: Int { 1 + ControllerHost.playerCount + 1 } // Schalter, Spieler, Spiele-Anbindung
@@ -22,11 +23,12 @@ struct ControllerView: View {
         .focused($focused)
         .focusEffectDisabled()
         .onAppear { focused = true }
+        .onChange(of: index) { _, _ in confirmOff = nil }
         .onKeyPress(phases: [.down, .repeat]) { press in
             switch press.key {
             case .upArrow: index = max(index - 1, 0)
             case .downArrow: index = min(index + 1, rows - 1)
-            case .rightArrow, .return, .space: if press.phase == .down { activate() }
+            case .return, .space: if press.phase == .down { activate() } // nur A: ein Druck nach rechts darf den Host nicht ausschalten
             case .escape, .leftArrow: if press.phase == .down { close() }
             default: return .ignored
             }
@@ -59,15 +61,24 @@ struct ControllerView: View {
     }
 
     private func value(_ i: Int) -> String {
-        if i == 0 { return host.enabled ? "An" : "Aus" }
+        if i == 0 { return confirmOff != nil ? "A noch einmal: das iPhone trennt sich" : host.enabled ? "An" : "Aus" }
         guard i <= ControllerHost.playerCount else { return host.snapshot.dsu }
         let p = host.snapshot.players[i - 1]
         guard let name = p.name else { return "frei" }
         return p.connected ? name + (p.latency.map { " · \($0) ms" } ?? "") : "\(name) (getrennt)"
     }
 
+    /// Ein iPhone, das am Host hängt, steuert diese Seite selbst: Ausschalten trennt es und ließe es ohne Kontrolle. Darum braucht es dann ein zweites A.
     private func activate() {
-        if index == 0 { host.enabled.toggle() }
+        guard index == 0 else { return }
+        if host.enabled, host.snapshot.players.contains(where: \.connected), confirmOff == nil {
+            let until = Date().addingTimeInterval(3)
+            confirmOff = until
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { if confirmOff == until { confirmOff = nil } }
+            return
+        }
+        confirmOff = nil
+        host.enabled.toggle()
     }
 
     private var footer: some View {
