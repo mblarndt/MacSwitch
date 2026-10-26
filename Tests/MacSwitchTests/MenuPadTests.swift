@@ -47,15 +47,11 @@ final class MenuPadTests: XCTestCase {
         XCTAssertEqual(c(state(.up, leftX: 255)), [.up, .right], "Diagonale: beide")
     }
 
-    func testKeyEventsAreReadAsKeyboardKeys() throws {
-        let up = try XCTUnwrap(MenuPad.Key.up.event(windowNumber: 7, isRepeat: false))
-        XCTAssertEqual(up.keyCode, 126)
-        XCTAssertEqual(up.windowNumber, 7)
-        XCTAssertEqual(up.characters?.unicodeScalars.first?.value, UInt32(NSUpArrowFunctionKey))
-        XCTAssertEqual(try XCTUnwrap(MenuPad.Key.confirm.event(windowNumber: 1, isRepeat: false)).keyCode, 36)
-        XCTAssertEqual(try XCTUnwrap(MenuPad.Key.back.event(windowNumber: 1, isRepeat: false)).keyCode, 53)
-        XCTAssertEqual(try XCTUnwrap(MenuPad.Key.options.event(windowNumber: 1, isRepeat: false)).characters, "+")
-        XCTAssertTrue(try XCTUnwrap(MenuPad.Key.left.event(windowNumber: 1, isRepeat: true)).isARepeat)
-        XCTAssertNil(MenuPad.Key.home.event(windowNumber: 1, isRepeat: false), "Home ist keine Taste")
+    func testMenuKeysBecomePageKeys() {
+        XCTAssertTrue(MenuPad.Key.up.pageKey(isRepeat: false).key == .upArrow && MenuPad.Key.up.pageKey(isRepeat: false).isDown)
+        XCTAssertTrue(MenuPad.Key.down.pageKey(isRepeat: true).key == .downArrow && !MenuPad.Key.down.pageKey(isRepeat: true).isDown, "Wiederholung: nicht .down")
+        XCTAssertTrue(MenuPad.Key.confirm.pageKey(isRepeat: false).key == .return)
+        XCTAssertTrue(MenuPad.Key.back.pageKey(isRepeat: false).key == .escape)
+        XCTAssertEqual(MenuPad.Key.options.pageKey(isRepeat: false).characters, "+")
     }
 }

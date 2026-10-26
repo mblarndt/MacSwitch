@@ -81,3 +81,16 @@ final class NxnativeUpdaterTests: XCTestCase {
         XCTAssertEqual(NxnativeUpdater.check(repo: plain), .failed("kein Git-Ordner"))
     }
 }
+
+final class NxnativeHeadTests: XCTestCase {
+    func testLocalHeadShowsHashDateAndAge() throws {
+        let d = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        for args in [["init", "-q", "-b", "main"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "eins"]] {
+            XCTAssertEqual(NxnativeUpdater.git(args, in: d).status, 0)
+        }
+        let head = try XCTUnwrap(NxnativeUpdater.localHead(repo: d))
+        XCTAssertNotNil(head.range(of: #"^[0-9a-f]{7,} · \d\d\.\d\d\.\d{4} \(.+\)$"#, options: .regularExpression), head)
+        XCTAssertNil(NxnativeUpdater.localHead(repo: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)))
+    }
+}

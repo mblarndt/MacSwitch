@@ -65,7 +65,7 @@ final class NxnativeUpdater: ObservableObject {
         guard up.status == 0 else { return .failed("Zweig ohne Upstream") }
         guard let behind = Int(git(["rev-list", "--count", "HEAD..\(up.output)"], in: repo).output) else { return .failed("Vergleich fehlgeschlagen") }
         if behind == 0 { return .current }
-        let when = git(["log", "-1", "--format=%cr", up.output], in: repo).output
+        let when = TimeInterval(git(["log", "-1", "--format=%ct", up.output], in: repo).output).map(age) ?? ""
         // Lokale Änderungen an Dateien, die das Update ebenfalls ändert, würden beim Einspielen kollidieren.
         func names(_ args: [String]) -> Set<String> { Set(git(args, in: repo).output.split(separator: "\n").map(String.init)) }
         let clash = names(["diff", "--name-only", "HEAD..\(up.output)"]).intersection(names(["diff", "--name-only", "HEAD"])).sorted()
@@ -89,6 +89,24 @@ final class NxnativeUpdater: ObservableObject {
         _ = git(["merge", "--abort"], in: repo) // zurück auf den Stand davor
         if conflicts.isEmpty { return .failed(merge.output.split(separator: "\n").last.map(String.init) ?? "Merge fehlgeschlagen") }
         return .failed("Konflikte in \(conflicts.prefix(3).joined(separator: ", ")): im Terminal zusammenführen")
+    }
+
+    /// "vor 25 Minuten" aus einem Unix-Zeitstempel (Git liefert ihn sprachunabhängig).
+    static func age(_ timestamp: TimeInterval) -> String {
+        let f = RelativeDateTimeFormatter()
+        f.locale = Locale(identifier: "de_DE")
+        f.unitsStyle = .full
+        return f.localizedString(for: Date(timeIntervalSince1970: timestamp), relativeTo: Date())
+    }
+
+    /// Der Stand des Ordners: kurzer Commit-Hash, Datum und wie lange das her ist, etwa "d62ddbb · 25.10.2026 (vor 2 Stunden)". nil ohne Git-Ordner.
+    static func localHead(repo: URL) -> String? {
+        let r = git(["log", "-1", "--format=%h|%ct"], in: repo, timeout: 10)
+        let c = r.output.split(separator: "|").map(String.init)
+        guard r.status == 0, c.count == 2, let ts = TimeInterval(c[1]) else { return nil }
+        let day = DateFormatter()
+        day.dateFormat = "dd.MM.yyyy"
+        return "\(c[0]) · \(day.string(from: Date(timeIntervalSince1970: ts))) (\(age(ts)))"
     }
 
     /// Text für die Anzeige.

@@ -48,9 +48,9 @@ struct GameOptionsView: View {
         .onAppear { refresh(); focused = true }
         .onChange(of: picking) { _, field in if field == nil { focused = true } }
         .onChange(of: showSettings) { _, open in if !open { focused = true } }
-        .onKeyPress(phases: [.down, .repeat]) { press in
+        .pageKeys { press in
             guard picking == nil, !showSettings else { return .ignored } // der Datei-Browser hat den Fokus; was er nicht braucht, geht nicht an diese Seite
-            let down = press.phase == .down
+            let down = press.isDown
             switch press.key {
             case .upArrow: index = max(index - 1, 0)
             case .downArrow: index = min(index + 1, fields.count - 1)

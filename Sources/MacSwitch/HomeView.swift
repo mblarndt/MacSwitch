@@ -76,7 +76,7 @@ struct HomeView: View {
     @FocusState private var focused: Bool
 
     /// Welche Seiten über dem Menü liegen (Bits); 0 = keine. Für Animation, Fokus und gesperrte Menü-Eingaben.
-    private var pages: Int { (showBrowser ? 1 : 0) | (showBuilder ? 2 : 0) | (showControllers ? 4 : 0) | (optionsGame == nil ? 0 : 8) }
+    private var pages: Int { (showBrowser ? 1 : 0) | (showBuilder ? 2 : 0) | (showControllers ? 4 : 0) | (optionsGame == nil ? 0 : 8) | (showSettings ? 16 : 0) }
 
     private var selectedGame: Game? { !onDock && library.games.indices.contains(gameIndex) ? library.games[gameIndex] : nil }
     /// Einstellungen (und Updates und DLC) gibt es nur für Spiele, die mit nxnative gebaut wurden.
@@ -105,7 +105,6 @@ struct HomeView: View {
         .focused($focused)
         .focusEffectDisabled()
         .onAppear { focused = true; controllers.onMenu = deliver; pads.onMenu = deliver; updater.check(repo: builder.repo) }
-        .onChange(of: showSettings) { _, open in if !open { focused = true } }
         .onChange(of: pages) { _, open in if open == 0 { focused = true } }
         .onChange(of: library.games.count) { _, n in gameIndex = min(gameIndex, n + 1) }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in library.reload() }
@@ -117,27 +116,28 @@ struct HomeView: View {
             }
             return true
         }
-        .onKeyPress(phases: [.down, .repeat], action: handle)
+        .onKeyPress(phases: [.down, .repeat]) { handle(PageKey($0)) }
     }
 
-    /// Menü-Tasten vom iPhone: als Tastenereignis ins Menü, wenn MacSwitch vorn ist; Home holt MacSwitch nach vorn, auch aus einem laufenden Spiel.
+    /// Menü-Tasten vom iPhone und von Controllern: direkt in die Menüs, wenn MacSwitch vorn ist (nicht über Tastenereignisse und Fokus); Home holt MacSwitch nach vorn, auch aus einem laufenden Spiel.
     private func deliver(_ key: MenuPad.Key, isRepeat: Bool) {
         if key == .home { return session.home() }
-        guard NSApp.isActive, let window = NSApp.keyWindow, let event = key.event(windowNumber: window.windowNumber, isRepeat: isRepeat) else { return }
-        NSApp.postEvent(event, atStart: false)
+        guard NSApp.isActive else { return }
+        _ = handle(key.pageKey(isRepeat: isRepeat))
     }
 
-    private func handle(_ press: KeyPress) -> KeyPress.Result {
-        guard session.game == nil, pages == 0 else { return .handled } // während Start/Spiel und auf den Seiten darüber keine Menü-Eingaben
+    private func handle(_ press: PageKey) -> KeyPress.Result {
+        guard session.game == nil else { return .handled } // während Start und Spiel keine Menü-Eingaben
+        guard pages == 0 else { return KeyRouter.shared.route(press) } // mit einer Seite darüber gehören die Tasten ihr
         switch press.key {
         case .leftArrow: move(dx: -1)
         case .rightArrow: move(dx: 1)
         case .upArrow: onDock = false
         case .downArrow: onDock = true
-        case .return, .space: if press.phase == .down { activate() }
+        case .return, .space: if press.isDown { activate() }
         default:
             guard press.characters == "+" else { return .ignored }
-            if press.phase == .down { openOptions() }
+            if press.isDown { openOptions() }
         }
         return .handled
     }
@@ -148,6 +148,9 @@ struct HomeView: View {
         }
         if showBuilder {
             BuilderView { showBuilder = false }.transition(.move(edge: .trailing).combined(with: .opacity))
+        }
+        if showSettings {
+            SettingsView(close: { showSettings = false }, addGame: { showSettings = false; showBrowser = true }).transition(.move(edge: .trailing).combined(with: .opacity))
         }
         if showControllers {
             ControllerView { showControllers = false }.transition(.move(edge: .trailing).combined(with: .opacity))
@@ -241,21 +244,9 @@ struct HomeView: View {
             ForEach(Array(DockItem.allCases.enumerated()), id: \.offset) { i, item in
                 DockButton(item: item, selected: onDock && i == dockIndex)
                     .onTapGesture { tapDock(i) }
-                    .popover(isPresented: Binding(get: { showSettings && item == .settings }, set: { showSettings = $0 })) {
-                        settingsMenu
-                    }
             }
         }
         .frame(height: 130)
-    }
-
-    private var settingsMenu: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button("Spiel hinzufügen…") { showSettings = false; showBrowser = true }
-            Button("Games-Ordner öffnen") { NSWorkspace.shared.open(GameLibrary.folder) }
-            Toggle("Dunkles Design", isOn: $dark)
-        }
-        .padding(16)
     }
 
     private var footer: some View {

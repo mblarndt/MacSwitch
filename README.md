@@ -13,9 +13,14 @@ open build/MacSwitch.app
 
 MacSwitch startet im Vollbild (rahmenlos, ohne Dock und Menüleiste). Beenden: Power-Symbol unten rechts oder ⌘Q.
 
+## Systemeinstellungen
+
+Das Regler-Symbol im Dock öffnet die Seite **Systemeinstellungen**: Dunkles Design, Spiel hinzufügen, Games-Ordner öffnen und unter „nxnative" der **Stand von nxnative** (Commit, Datum und wie lange das her ist),
+ob es im offiziellen Repository Neues gibt, und die Zeile zum Aktualisieren. Sie lässt sich wie alle Seiten mit Tastatur, iPhone und Controller bedienen.
+
 ## Apps hinzufügen
 
-- Regler-Symbol unten → „Spiel hinzufügen…" öffnet den Datei-Browser (startet in `/Applications`).
+- Regler-Symbol unten → Systemeinstellungen → „Spiel hinzufügen …" öffnet den Datei-Browser (startet in `/Applications`); auch die Kachel „Apps hinzufügen" tut das.
   ↑ ↓ wählen, → / Enter öffnet Ordner bzw. fügt die App hinzu, ← geht einen Ordner hoch, Esc schließt.
 - Oder eine `.app` aufs Fenster ziehen.
 

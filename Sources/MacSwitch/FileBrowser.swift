@@ -67,16 +67,16 @@ struct FileBrowser: View {
         .focused($focused)
         .focusEffectDisabled()
         .onAppear { entries = Self.entries(in: dir, kind: kind); focused = true }
-        .onKeyPress(phases: [.down, .repeat]) { press in
+        .pageKeys { press in
             switch press.key {
             case .upArrow: index = max(index - 1, 0)
             case .downArrow: index = min(index + 1, max(entries.count - 1, 0))
             case .leftArrow, .delete: goUp()
-            case .rightArrow, .return: if press.phase == .down { open() }
+            case .rightArrow, .return: if press.isDown { open() }
             case .space:
                 guard case .folder = kind else { return .ignored }
-                if press.phase == .down { pickFolder() }
-            case .escape: if press.phase == .down { close() }
+                if press.isDown { pickFolder() }
+            case .escape: if press.isDown { close() }
             default: return .ignored
             }
             return .handled

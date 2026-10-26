@@ -34,12 +34,12 @@ struct ControllerView: View {
         .focusEffectDisabled()
         .onAppear { focused = true }
         .onChange(of: index) { _, _ in confirmOff = nil }
-        .onKeyPress(phases: [.down, .repeat]) { press in
+        .pageKeys { press in
             switch press.key {
             case .upArrow: index = max(index - 1, 0)
             case .downArrow: index = min(index + 1, rows - 1)
-            case .return, .space: if press.phase == .down { activate() } // nur A: ein Druck nach rechts darf den Host nicht ausschalten
-            case .escape, .leftArrow: if press.phase == .down { close() }
+            case .return, .space: if press.isDown { activate() } // nur A: ein Druck nach rechts darf den Host nicht ausschalten
+            case .escape, .leftArrow: if press.isDown { close() }
             default: return .ignored
             }
             return .handled

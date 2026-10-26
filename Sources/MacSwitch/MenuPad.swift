@@ -1,4 +1,4 @@
-import AppKit
+import SwiftUI
 
 /// Das MacSwitch-Menü per iPhone: aus dem Zustand eines Controllers werden Menü-Tasten, die wie Tastaturereignisse ins Menü gehen.
 /// Steuerkreuz und linker Stick wählen (gehalten wiederholt es), A bestätigt, B geht zurück, + öffnet die Optionen eines Spiels,
@@ -9,27 +9,17 @@ struct MenuPad {
 
         var repeats: Bool { self == .up || self == .down || self == .left || self == .right }
 
-        private var stroke: (characters: String, code: UInt16, flags: NSEvent.ModifierFlags)? {
-            func arrow(_ function: Int, _ code: UInt16) -> (String, UInt16, NSEvent.ModifierFlags) {
-                (String(Character(UnicodeScalar(UInt16(function))!)), code, [.numericPad, .function])
-            }
+        /// Die Taste, die die Menüs dafür lesen: Pfeile, Return (A), Escape (B) und "+".
+        func pageKey(isRepeat: Bool) -> PageKey {
             switch self {
-            case .up: return arrow(NSUpArrowFunctionKey, 126)
-            case .down: return arrow(NSDownArrowFunctionKey, 125)
-            case .left: return arrow(NSLeftArrowFunctionKey, 123)
-            case .right: return arrow(NSRightArrowFunctionKey, 124)
-            case .confirm: return ("\r", 36, [])
-            case .back: return ("\u{1B}", 53, [])
-            case .options: return ("+", 24, [])
-            case .home: return nil // keine Taste: MacSwitch holt sich selbst nach vorn
-            }
-        }
-
-        /// Das Tastenereignis, das die Menüs (`onKeyPress`) wie von einer Tastatur lesen.
-        func event(windowNumber: Int, isRepeat: Bool) -> NSEvent? {
-            stroke.flatMap {
-                NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: $0.flags, timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: windowNumber,
-                                 context: nil, characters: $0.characters, charactersIgnoringModifiers: $0.characters, isARepeat: isRepeat, keyCode: $0.code)
+            case .up: PageKey(key: .upArrow, isDown: !isRepeat)
+            case .down: PageKey(key: .downArrow, isDown: !isRepeat)
+            case .left: PageKey(key: .leftArrow, isDown: !isRepeat)
+            case .right: PageKey(key: .rightArrow, isDown: !isRepeat)
+            case .confirm: PageKey(key: .return, characters: "\r", isDown: !isRepeat)
+            case .back: PageKey(key: .escape, characters: "\u{1B}", isDown: !isRepeat)
+            case .options: PageKey(key: KeyEquivalent("+"), characters: "+", isDown: !isRepeat)
+            case .home: PageKey(key: KeyEquivalent("h"), isDown: !isRepeat) // Home ist keine Taste; die HomeView holt sich selbst nach vorn
             }
         }
     }

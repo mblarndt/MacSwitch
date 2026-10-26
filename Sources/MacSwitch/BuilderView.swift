@@ -40,9 +40,9 @@ struct BuilderView: View {
         .onAppear { focused = true; refreshRecipe() }
         .onChange(of: updater.state) { _, _ in refreshRecipe() }
         .onChange(of: picking) { _, field in if field == nil { focused = true } }
-        .onKeyPress(phases: [.down, .repeat]) { press in
+        .pageKeys { press in
             guard picking == nil else { return .ignored } // der Datei-Browser hat den Fokus; was er nicht braucht, geht nicht an diese Seite
-            let down = press.phase == .down
+            let down = press.isDown
             let char = press.characters.lowercased()
             if showsRun {
                 switch press.key {

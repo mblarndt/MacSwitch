@@ -27,8 +27,8 @@ struct GameSettingsView: View {
         .focused($focused)
         .focusEffectDisabled()
         .onAppear { load(); focused = true }
-        .onKeyPress(phases: [.down, .repeat]) { press in
-            let down = press.phase == .down
+        .pageKeys { press in
+            let down = press.isDown
             switch press.key {
             case .upArrow: index = max(index - 1, 0)
             case .downArrow: index = min(index + 1, rows - 1)
