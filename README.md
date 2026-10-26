@@ -45,6 +45,13 @@ und zeigt dann oben im Menü „nxnative: N neue Änderungen" (anklicken öffnet
 unverändert und die Zeile nennt den Grund (dann im Ordner committen oder im Terminal aktualisieren). Lokale Änderungen an anderen Dateien bleiben erhalten.
 Gebaute Spiele übernehmen die Änderungen erst mit „Neu bauen". Ohne Netz oder ohne Git-Ordner passiert beim Start nichts.
 
+### Gibt es ein Rezept für das Spiel?
+
+nxnative baut nur Spiele zuverlässig, für die es ein „Rezept" gibt: ein Spielprofil unter `dm/games/<Title-ID>/game.tsv`. Wählst du in „Spiel bauen" das Hauptspiel, erscheint darunter die Zeile
+**Rezept**: grün „vorhanden: <Name> (getestet: <Versionen>)", orange „erst im offiziellen Repository: nxnative aktualisieren" (das Profil gibt es im Upstream, aber noch nicht in deinem Ordner),
+orange „keins für <Title-ID>: nxnative versucht es trotzdem, die App startet vielleicht nicht" oder „Titel-ID nicht erkennbar". Die Title-ID liest MacSwitch aus dem `[…]` im Dateinamen, sonst aus dem Ticket
+in der NSP; ein Update zählt als sein Basisspiel. Die Prüfung läuft lokal (der Upstream-Vergleich nutzt den letzten `git fetch`).
+
 ### Einstellungen pro Spiel
 
 Bei jedem mit nxnative gebauten Spiel öffnet `+` (oder Controller-Menütaste) die **Optionen**, deren erste Zeile **Einstellungen** ist: Bildrate (30/60), Renderauflösung, Konsolenmodus

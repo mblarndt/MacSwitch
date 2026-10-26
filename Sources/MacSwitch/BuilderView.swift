@@ -4,7 +4,7 @@ import SwiftUI
 /// Der Lauf gehört dem GameBuilder und geht weiter, wenn man diese Seite schließt.
 struct BuilderView: View {
     private enum Field: Hashable {
-        case repo, nxUpdate, rom, update, dlc(URL), addDlc, keys, out, start
+        case repo, nxUpdate, rom, recipe, update, dlc(URL), addDlc, keys, out, start
     }
 
     @EnvironmentObject private var library: GameLibrary
@@ -13,9 +13,10 @@ struct BuilderView: View {
     let close: () -> Void
     @State private var index = 0
     @State private var picking: Field?
+    @State private var recipe: Recipe.Result? // ob nxnative für das gewählte Hauptspiel ein Rezept (Spielprofil) hat
     @FocusState private var focused: Bool
 
-    private var fields: [Field] { [.repo, .nxUpdate, .rom, .update] + builder.dlcs.map(Field.dlc) + [.addDlc, .keys, .out, .start] }
+    private var fields: [Field] { [.repo, .nxUpdate, .rom] + (recipe == nil ? [] : [.recipe]) + [.update] + builder.dlcs.map(Field.dlc) + [.addDlc, .keys, .out, .start] }
     private var showsRun: Bool { !builder.status.isEmpty }
 
     var body: some View {
@@ -36,7 +37,8 @@ struct BuilderView: View {
         .focusable()
         .focused($focused)
         .focusEffectDisabled()
-        .onAppear { focused = true }
+        .onAppear { focused = true; refreshRecipe() }
+        .onChange(of: updater.state) { _, _ in refreshRecipe() }
         .onChange(of: picking) { _, field in if field == nil { focused = true } }
         .onKeyPress(phases: [.down, .repeat]) { press in
             guard picking == nil else { return .ignored } // der Datei-Browser hat den Fokus; was er nicht braucht, geht nicht an diese Seite
@@ -94,7 +96,7 @@ struct BuilderView: View {
             Spacer()
             Text(value(field))
                 .font(.system(size: 20, design: .rounded))
-                .foregroundStyle(Theme.subtle)
+                .foregroundStyle(field == .recipe ? (recipe?.good == true ? Theme.cursor : .orange) : Theme.subtle)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
@@ -106,6 +108,7 @@ struct BuilderView: View {
         case .repo: "nxnative-Ordner"
         case .nxUpdate: "nxnative aktualisieren"
         case .rom: "Hauptspiel"
+        case .recipe: "Rezept"
         case .update: "Update (optional)"
         case .dlc: "DLC"
         case .addDlc: "DLC hinzufügen …"
@@ -125,6 +128,7 @@ struct BuilderView: View {
         case .keys: return builder.keys?.path ?? none
         case .out: return builder.out?.path ?? none
         case .nxUpdate: return updater.summary
+        case .recipe: return recipe?.text ?? ""
         case .addDlc, .start: return ""
         }
     }
@@ -153,19 +157,22 @@ struct BuilderView: View {
 
     private func set(_ field: Field, _ url: URL) {
         switch field {
-        case .repo: builder.repo = url
-        case .rom: builder.rom = url
+        case .repo: builder.repo = url; refreshRecipe()
+        case .rom: builder.rom = url; refreshRecipe()
         case .update: builder.update = url
         case .addDlc: if !builder.dlcs.contains(url) { builder.dlcs.append(url) }
         case .keys: builder.keys = url
         case .out: builder.out = url
-        case .dlc, .start, .nxUpdate: break
+        case .dlc, .start, .nxUpdate, .recipe: break
         }
     }
+
+    private func refreshRecipe() { recipe = builder.rom.map { Recipe.lookup(rom: $0, repo: builder.repo) } }
 
     private func activate() {
         switch fields[index] {
         case .start: if builder.ready { builder.start { library.add([$0]) } }
+        case .recipe: break
         case .nxUpdate: if updater.state.updatable { updater.update(repo: builder.repo) } else { updater.check(repo: builder.repo) }
         case .dlc(let url): remove(.dlc(url))
         case let field: picking = field
@@ -236,6 +243,7 @@ struct BuilderView: View {
         switch fields[index] {
         case .start: "Bauen"
         case .nxUpdate: updater.state.updatable ? "Aktualisieren" : "Prüfen"
+        case .recipe: "Info"
         case .dlc: "Entfernen"
         default: "Wählen"
         }
