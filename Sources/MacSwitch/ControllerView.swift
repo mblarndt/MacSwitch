@@ -4,12 +4,13 @@ import SwiftUI
 /// Die Spiele lesen die Plätze über den DSU-Server des Hosts (nxnative-Host: Spieler 1 bis 4 mit analogen Sticks).
 struct ControllerView: View {
     @EnvironmentObject private var host: ControllerHost
+    @EnvironmentObject private var pads: PhysicalPads
     let close: () -> Void
     @State private var index = 0
     @State private var confirmOff: Date? // bis wann ein zweites A das Ausschalten bestätigt
     @FocusState private var focused: Bool
 
-    private var rows: Int { 1 + ControllerHost.playerCount + 1 } // Schalter, Spieler, Spiele-Anbindung
+    private var rows: Int { 1 + ControllerHost.playerCount + 1 + max(pads.names.count, 1) } // Schalter, Spieler, Spiele-Anbindung, echte Controller
 
     var body: some View {
         VStack(spacing: 0) {
@@ -57,12 +58,17 @@ struct ControllerView: View {
     }
 
     private func label(_ i: Int) -> String {
-        i == 0 ? "iPhone-Controller" : i <= ControllerHost.playerCount ? "Spieler \(i)" : "Anbindung für Spiele"
+        let n = ControllerHost.playerCount
+        if i == 0 { return "iPhone-Controller" }
+        if i <= n { return "Spieler \(i)" }
+        if i == n + 1 { return "Anbindung für Spiele" }
+        return pads.names.indices.contains(i - n - 2) ? pads.names[i - n - 2] : "Controller (Bluetooth oder Kabel)"
     }
 
     private func value(_ i: Int) -> String {
         if i == 0 { return confirmOff != nil ? "A noch einmal: das iPhone trennt sich" : host.enabled ? "An" : "Aus" }
-        guard i <= ControllerHost.playerCount else { return host.snapshot.dsu }
+        if i == ControllerHost.playerCount + 1 { return host.snapshot.dsu }
+        if i > ControllerHost.playerCount + 1 { return pads.names.isEmpty ? "keiner verbunden" : "verbunden" }
         let p = host.snapshot.players[i - 1]
         guard let name = p.name else { return "frei" }
         return p.connected ? name + (p.latency.map { " · \($0) ms" } ?? "") : "\(name) (getrennt)"

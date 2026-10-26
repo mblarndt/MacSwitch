@@ -75,3 +75,32 @@ struct MenuPad {
     /// Wann `update` ohne neuen Zustand wieder etwas auslöst; nil, wenn nichts wiederholt.
     var nextRepeat: TimeInterval? { held.values.filter { $0.isFinite }.min() }
 }
+
+/// Macht aus den Zuständen einer Quelle (iPhone, Controller) Menü-Tasten samt Wiederholung für gehaltene Richtungen.
+/// Alles läuft auf `queue`; `deliver` bekommt die Tasten auf dem Haupt-Thread.
+final class MenuDriver {
+    private var pad = MenuPad()
+    private var timer: DispatchWorkItem?
+    private let queue: DispatchQueue
+    private let deliver: (MenuPad.Key, Bool) -> Void
+
+    init(queue: DispatchQueue, deliver: @escaping (MenuPad.Key, Bool) -> Void) {
+        self.queue = queue
+        self.deliver = deliver
+    }
+
+    /// Der aktuelle Zustand der Quelle (nil: keiner). Muss auf `queue` aufgerufen werden.
+    func update(_ state: GamepadState?) {
+        let now = ProcessInfo.processInfo.systemUptime
+        for (key, isRepeat) in pad.update(state, now: now) {
+            DispatchQueue.main.async { self.deliver(key, isRepeat) }
+        }
+        timer?.cancel()
+        timer = nil
+        if let due = pad.nextRepeat {
+            let item = DispatchWorkItem { [weak self] in self?.update(state) } // derselbe Zustand: nur die fälligen Wiederholungen
+            timer = item
+            queue.asyncAfter(deadline: .now() + max(0, due - now), execute: item)
+        }
+    }
+}

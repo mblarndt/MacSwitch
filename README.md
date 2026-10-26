@@ -64,6 +64,16 @@ Der nxnative-Host hat dafür einen DSU-Client (`dm/host/dsu_pad.h`, `front_mac.m
 - Der DSU-Server (`DSUServer.swift`) ist eine Kopie aus AstrisPhoneController, ebenso der Lese-Teil des Funkprotokolls (`ControllerProtocol.swift`); die Senderseite
   steht in `iPhoneController/Logic/PadWire.swift`, und `Tests/MacSwitchTests/PadLogicTests.swift` prüft beide gegeneinander.
 
+### Echte Controller (Xbox, PlayStation, Pro Controller …)
+
+Ein Controller am Mac (Bluetooth oder USB-Kabel; Xbox: Pairing-Taste oben etwa 3 s halten, dann in Systemeinstellungen → Bluetooth verbinden) bedient das MacSwitch-Menü
+wie das iPhone: Steuerkreuz oder linker Stick wählen, die rechte Fläche (Xbox B, die Switch-„A"-Position) bestätigt, die untere (Xbox A) geht zurück, Menü (+) öffnet
+„Updates & DLC", Home (Guide-Knopf) holt MacSwitch nach vorn, auch aus einem laufenden Spiel. Die Controller-Seite zeigt die verbundenen Controller.
+
+In den Spielen liest der nxnative-Host die Controller selbst; jeder ist dort ein Spieler (bis 8), die Tasten gelten nach Lage wie auf der Switch.
+Controller dürfen jederzeit, auch im laufenden Spiel, dazukommen oder wegfallen: Ein Spiel für einen Spieler bekommt alle Controller (und das iPhone) zugleich als Spieler 1, man greift also
+einfach zum anderen. In Spielen für mehrere gilt die Reihenfolge des Verbindens; ein Controller, der wiederkommt, bekommt seinen Spieler zurück. Die Reihenfolge im laufenden Spiel zu ändern geht nicht.
+
 ### iPhone-App „MacSwitch Controller"
 
 Ein Switch-Controller im Querformat: A B X Y, L R ZL ZR, Steuerkreuz, beide Sticks, +, −, Capture, Home und die Stickklicks L3/R3, mit Multitouch

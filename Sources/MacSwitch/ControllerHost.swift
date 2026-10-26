@@ -43,8 +43,8 @@ final class ControllerHost: NSObject, ObservableObject, CBPeripheralManagerDeleg
     private var presence: CBMutableCharacteristic?
     private var dsu: DSUServer?
     private var advertising = false
-    private var menu = MenuPad() // das iPhone mit dem niedrigsten Platz bedient auch das MacSwitch-Menü
-    private var menuTimer: DispatchWorkItem?
+    /// Das iPhone mit dem niedrigsten Platz bedient auch das MacSwitch-Menü.
+    private lazy var menuDriver = MenuDriver(queue: queue) { [weak self] key, isRepeat in self?.onMenu?(key, isRepeat) }
     private var bluetooth = "Bluetooth wird vorbereitet …"
     private var activity: NSObjectProtocol? // verhindert App Nap, solange ein iPhone verbunden ist
 
@@ -256,20 +256,9 @@ final class ControllerHost: NSObject, ObservableObject, CBPeripheralManagerDeleg
         }
     }
 
-    /// Das iPhone mit dem niedrigsten Platz bedient das Menü: sein Zustand wird zu Menü-Tasten (MenuPad), gehaltene Richtungen wiederholen sich.
     private func driveMenu() {
         let phone = playerOf.filter { subscribers.contains($0.key) }.min { $0.value < $1.value }?.key
-        let now = ProcessInfo.processInfo.systemUptime
-        for (key, isRepeat) in menu.update(phone.flatMap { lastStates[$0] }, now: now) {
-            DispatchQueue.main.async { self.onMenu?(key, isRepeat) }
-        }
-        menuTimer?.cancel()
-        menuTimer = nil
-        if let due = menu.nextRepeat {
-            let item = DispatchWorkItem { [weak self] in self?.driveMenu() }
-            menuTimer = item
-            queue.asyncAfter(deadline: .now() + max(0, due - now), execute: item)
-        }
+        menuDriver.update(phone.flatMap { lastStates[$0] })
     }
 
     // MARK: Zustand

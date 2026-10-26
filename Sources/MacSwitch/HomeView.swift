@@ -62,6 +62,7 @@ struct HomeView: View {
     @EnvironmentObject private var session: GameSession
     @EnvironmentObject private var builder: GameBuilder
     @EnvironmentObject private var controllers: ControllerHost
+    @EnvironmentObject private var pads: PhysicalPads
     @AppStorage("darkTheme") private var dark = false
     @State private var onDock = false
     @State private var gameIndex = 0 // hinter den Spielen: Kachel "Apps hinzufügen", dann "Spiel bauen"
@@ -102,7 +103,7 @@ struct HomeView: View {
         .focusable()
         .focused($focused)
         .focusEffectDisabled()
-        .onAppear { focused = true; controllers.onMenu = deliver }
+        .onAppear { focused = true; controllers.onMenu = deliver; pads.onMenu = deliver }
         .onChange(of: showSettings) { _, open in if !open { focused = true } }
         .onChange(of: pages) { _, open in if open == 0 { focused = true } }
         .onChange(of: library.games.count) { _, n in gameIndex = min(gameIndex, n + 1) }
