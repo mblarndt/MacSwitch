@@ -32,7 +32,7 @@ struct GameOptionsView: View {
             }
             .background(Theme.background)
             if let field = picking {
-                FileBrowser(kind: field == .keys ? .file(["keys"]) : .file(GameBuilder.extensions), title: title(field), start: startDir(field), choose: { set(field, $0) }) { picking = nil }
+                FileBrowser(kind: field == .keys ? .file(["keys"]) : .file(GameBuilder.extensions), title: title(field), start: startDir(field), choose: { set(field, $0) }, all: field == .keys ? nil : { setAll($0) }) { picking = nil }
                     .transition(.move(edge: .trailing).combined(with: .opacity))
             }
             if showSettings {
@@ -150,6 +150,13 @@ struct GameOptionsView: View {
             try GameBuilder.install(url, into: work)
             message = "\(url.deletingPathExtension().lastPathComponent) installiert – jetzt neu bauen"
         } catch { message = error.localizedDescription }
+        refresh()
+    }
+
+    private func setAll(_ urls: [URL]) {
+        guard let work else { return }
+        let r = GameBuilder.installAll(urls, into: work)
+        message = "\(r.done) \(r.done == 1 ? "Datei" : "Dateien") installiert – jetzt neu bauen" + (r.failed > 0 ? ", \(r.failed) unbrauchbar" : "")
         refresh()
     }
 

@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Datei-Browser im Switch-Look: Ordner und Apps als weiße Zeilen mit Cursor. Enter fügt eine App dem Menü hinzu.
 /// Mit `kind` wählt er stattdessen eine Datei (Enter) oder den aktuellen Ordner (Leertaste) und meldet sie über `choose`.
+/// Mit `all` wählt die Leertaste (+) stattdessen alle passenden Dateien des geöffneten Ordners auf einmal und meldet sie über `all`.
 struct FileBrowser: View {
     enum Kind {
         case app
@@ -15,6 +16,7 @@ struct FileBrowser: View {
     let kind: Kind
     let title: String
     let choose: (URL) -> Void
+    let all: (([URL]) -> Void)?
     let close: () -> Void
     @State private var dir: URL
     @State private var entries: [URL] = []
@@ -23,10 +25,11 @@ struct FileBrowser: View {
     @FocusState private var focused: Bool
 
     init(kind: Kind = .app, title: String = "Spiel hinzufügen", start: URL = URL(fileURLWithPath: "/Applications"),
-         choose: @escaping (URL) -> Void = { _ in }, close: @escaping () -> Void) {
+         choose: @escaping (URL) -> Void = { _ in }, all: (([URL]) -> Void)? = nil, close: @escaping () -> Void) {
         self.kind = kind
         self.title = title
         self.choose = choose
+        self.all = all
         self.close = close
         _dir = State(initialValue: start)
     }
@@ -74,8 +77,9 @@ struct FileBrowser: View {
             case .leftArrow, .delete: goUp()
             case .rightArrow, .return: if press.isDown { open() }
             case .space:
-                guard case .folder = kind else { return .ignored }
-                if press.isDown { pickFolder() }
+                if case .folder = kind { if press.isDown { pickFolder() } }
+                else if all != nil { if press.isDown { pickAll() } }
+                else { return .ignored }
             case .escape: if press.isDown { close() }
             default: return .ignored
             }
@@ -108,6 +112,7 @@ struct FileBrowser: View {
                 Hint(key: "←", label: "Ordner zurück").onTapGesture { goUp() }
                 Hint(key: "B", label: "Schließen").onTapGesture { close() }
                 if case .folder = kind { Hint(key: "+", label: "Diesen Ordner wählen").onTapGesture { pickFolder() } }
+                else if all != nil { Hint(key: "+", label: "Alle auswählen").onTapGesture { pickAll() } }
                 Hint(key: "A", label: selectedIsFile ? pickLabel : "Öffnen")
             }
         }
@@ -153,6 +158,13 @@ struct FileBrowser: View {
 
     private func pickFolder() {
         choose(dir)
+        close()
+    }
+
+    private func pickAll() {
+        let files = entries.filter { !Self.isFolder($0) }
+        guard !files.isEmpty else { message = "Keine passenden Dateien in diesem Ordner"; return }
+        all?(files)
         close()
     }
 

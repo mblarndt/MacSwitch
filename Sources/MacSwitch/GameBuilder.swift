@@ -98,6 +98,13 @@ final class GameBuilder: ObservableObject {
         }
     }
 
+    /// Verknüpft mehrere Dateien auf einmal („Alle auswählen“ im Datei-Browser); eine unbrauchbare hält die anderen nicht auf.
+    static func installAll(_ files: [URL], into work: URL) -> (done: Int, failed: Int) {
+        var failed = 0
+        for f in files { do { try install(f, into: work) } catch { failed += 1 } }
+        return (files.count - failed, failed)
+    }
+
     private func script(_ name: String) -> String { repo.appendingPathComponent("scripts/\(name)").path }
 
     /// Der Spielname für App und Arbeitsordner: Dateiname der Basisdatei ohne [Title-ID]- und (Versions-)Tags.

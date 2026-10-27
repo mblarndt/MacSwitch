@@ -106,6 +106,14 @@ final class BuilderTests: XCTestCase {
         XCTAssertEqual(GameBuilder.installedFiles(in: work).map(\.lastPathComponent), [rom.lastPathComponent, update.lastPathComponent])
         XCTAssertThrowsError(try GameBuilder.install(tmp.appendingPathComponent("notes.txt"), into: work))
 
+        let dlcs = ["Fake Game [0100000000000001].nsp", "Fake Game [0100000000000002].nsp"].map { tmp.appendingPathComponent($0) }
+        for d in dlcs { try Data().write(to: d) }
+        let notes = tmp.appendingPathComponent("notes.txt")
+        try Data().write(to: notes)
+        let r = GameBuilder.installAll(dlcs + [notes], into: work) // „Alle auswählen“: die unbrauchbare hält die anderen nicht auf
+        XCTAssertEqual(r.done, 2); XCTAssertEqual(r.failed, 1)
+        XCTAssertEqual(GameBuilder.installedFiles(in: work).count, 4)
+
         var rebuilt: URL?
         builder.rebuild(game) { rebuilt = $0 }
         wait()
