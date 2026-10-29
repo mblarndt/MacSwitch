@@ -1,3 +1,4 @@
+import GameController
 import SwiftUI
 
 // MARK: - Theme (Switch "Basic White" / "Basic Black")
@@ -199,9 +200,13 @@ struct HomeView: View {
                 .overlay(Circle().strokeBorder(.white, lineWidth: 3))
             updateBadge
             Spacer()
+            // Der Takt liest auch die Controller-Akkus neu: GameController meldet Akkuänderungen nicht per Notification.
             TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                Text(ctx.date.formatted(date: .omitted, time: .shortened))
-                    .font(.system(size: 26, weight: .medium, design: .rounded))
+                HStack(spacing: 22) {
+                    ForEach(GCController.controllers(), id: \.self) { ControllerBadge(controller: $0) }
+                    Text(ctx.date.formatted(date: .omitted, time: .shortened))
+                        .font(.system(size: 26, weight: .medium, design: .rounded))
+                }
             }
             Image(systemName: "wifi").font(.system(size: 22))
             Image(systemName: "battery.100").font(.system(size: 24))
@@ -314,6 +319,33 @@ struct Cursor<S: InsettableShape>: View {
             .padding(-6)
             .shadow(color: Theme.cursor.opacity(0.6), radius: 10)
             .onAppear { withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) { bright = true } }
+    }
+}
+
+/// Akku-Symbol passend zum Ladestand (macOS kennt nur 0/25/50/75/100 %).
+func batterySymbol(level: Float, charging: Bool) -> String {
+    if charging { return "battery.100percent.bolt" }
+    switch level {
+    case ..<0.125: return "battery.0percent"
+    case ..<0.375: return "battery.25percent"
+    case ..<0.625: return "battery.50percent"
+    case ..<0.875: return "battery.75percent"
+    default: return "battery.100percent"
+    }
+}
+
+/// Controller-Symbol, dazu der Akkustand, falls macOS ihn für dieses Gerät meldet (kabelgebunden/unbekannt → nur das Symbol).
+private struct ControllerBadge: View {
+    let controller: GCController
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "gamecontroller.fill").font(.system(size: 22))
+            if let b = controller.battery, b.batteryState != .unknown {
+                Image(systemName: batterySymbol(level: b.batteryLevel, charging: b.batteryState == .charging)).font(.system(size: 24))
+                Text("\(Int((b.batteryLevel * 100).rounded()))%").font(.system(size: 20, design: .rounded))
+            }
+        }
     }
 }
 

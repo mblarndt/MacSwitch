@@ -137,3 +137,12 @@ final class IconTests: XCTestCase {
         XCTAssertEqual(w, 256, accuracy: 4)
     }
 }
+
+final class BatteryTests: XCTestCase {
+    func testSymbolBuckets() {
+        XCTAssertEqual(batterySymbol(level: 0.05, charging: false), "battery.0percent")
+        XCTAssertEqual(batterySymbol(level: 0.5, charging: false), "battery.50percent")
+        XCTAssertEqual(batterySymbol(level: 1, charging: false), "battery.100percent")
+        XCTAssertEqual(batterySymbol(level: 0.3, charging: true), "battery.100percent.bolt")
+    }
+}
