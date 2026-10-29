@@ -11,6 +11,8 @@ Voraussetzung: macOS 14+, Xcode bzw. Command Line Tools (Swift 5.9+).
 open build/MacSwitch.app
 ```
 
+Controller-Akku: verbundene Controller erscheinen oben rechts neben der Uhr, mit Akkustand, sofern macOS ihn für das Gerät meldet.
+
 MacSwitch startet im Vollbild (rahmenlos, ohne Dock und Menüleiste). Beenden: Power-Symbol unten rechts oder ⌘Q.
 
 ## Apps hinzufügen
