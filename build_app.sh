@@ -4,6 +4,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 swift build -c release
 APP=build/MacSwitch.app
+# Läuft noch eine alte Instanz, holt `open` nur diese nach vorn (gleiche Bundle-ID) statt die neue zu starten.
+pkill -x MacSwitch || true
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$(swift build -c release --show-bin-path)/MacSwitch" "$APP/Contents/MacOS/"
@@ -19,4 +21,4 @@ done
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 
 codesign --force --sign - "$APP"
-echo "Fertig: open $APP"
+echo "Gebaut aus Commit $(git rev-parse --short HEAD 2>/dev/null || echo '?') – Fertig: open $APP"
