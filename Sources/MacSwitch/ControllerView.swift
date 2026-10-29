@@ -1,0 +1,108 @@
+import SwiftUI
+
+/// Controller (Dock): schaltet den iPhone-Host ein und zeigt, wer auf welchem Spielerplatz sitzt.
+/// Die Spiele lesen die Plätze über den DSU-Server des Hosts (nxnative-Host: Spieler 1 bis 4 mit analogen Sticks).
+struct ControllerView: View {
+    @EnvironmentObject private var host: ControllerHost
+    @EnvironmentObject private var pads: PhysicalPads
+    let close: () -> Void
+    @State private var index = 0
+    @State private var confirmOff: Date? // bis wann ein zweites A das Ausschalten bestätigt
+    @FocusState private var focused: Bool
+
+    /// Wer auf welchem Platz sitzt: iPhones und Controller in der Reihenfolge, in der sie sich verbunden haben (der erste ist Spieler 1).
+    static func seats(phones: [ControllerHost.Player], pads: [PhysicalPads.Device]) -> [(name: String, detail: String)] {
+        let all = phones.filter(\.connected).map { (name: $0.name ?? "iPhone", detail: $0.latency.map { "\($0) ms" } ?? "iPhone", since: $0.since ?? .distantPast) }
+            + pads.map { (name: $0.name, detail: "Controller", since: $0.since) }
+        return all.enumerated().sorted { ($0.element.since, $0.offset) < ($1.element.since, $1.offset) }.map { (name: $0.element.name, detail: $0.element.detail) }
+    }
+
+    private var seats: [(name: String, detail: String)] { Self.seats(phones: host.snapshot.players, pads: pads.devices) }
+    private var playerRows: Int { max(ControllerHost.playerCount, seats.count) }
+    private var rows: Int { 1 + playerRows + 1 } // Schalter, Spieler, Spiele-Anbindung
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ScreenHeader(symbol: "gamecontroller.fill", title: "Controller", subtitle: host.snapshot.status)
+            list
+            footer
+        }
+        .frame(width: 1280, height: 720)
+        .background(Theme.background)
+        .focusable()
+        .focused($focused)
+        .focusEffectDisabled()
+        .onAppear { focused = true }
+        .onChange(of: index) { _, _ in confirmOff = nil }
+        .pageKeys { press in
+            switch press.key {
+            case .upArrow: index = max(index - 1, 0)
+            case .downArrow: index = min(index + 1, rows - 1)
+            case .return, .space: if press.isDown { activate() } // nur A: ein Druck nach rechts darf den Host nicht ausschalten
+            case .escape, .leftArrow: if press.isDown { close() }
+            default: return .ignored
+            }
+            return .handled
+        }
+    }
+
+    private var list: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 16) {
+                    ForEach(0..<rows, id: \.self) { i in
+                        row(label(i), value(i), selected: i == index).id(i).onTapGesture { if i == index { activate() } else { index = i } }
+                    }
+                }
+                .padding(.horizontal, 140)
+                .padding(.vertical, 24)
+            }
+            .onChange(of: index) { _, i in withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(i, anchor: .center) } }
+        }
+    }
+
+    private func row(_ label: String, _ value: String, selected: Bool) -> some View {
+        HStack(spacing: 22) {
+            Text(label).font(.system(size: 26, design: .rounded)).foregroundStyle(Theme.text)
+            Spacer()
+            Text(value).font(.system(size: 20, design: .rounded)).foregroundStyle(Theme.subtle).lineLimit(1).truncationMode(.middle)
+        }
+        .menuRow(selected: selected)
+    }
+
+    private func label(_ i: Int) -> String {
+        i == 0 ? "iPhone-Controller" : i <= playerRows ? "Spieler \(i)" : "Anbindung für Spiele"
+    }
+
+    private func value(_ i: Int) -> String {
+        if i == 0 { return confirmOff != nil ? "A noch einmal: das iPhone trennt sich" : host.enabled ? "An" : "Aus" }
+        if i > playerRows { return host.snapshot.dsu }
+        return seats.indices.contains(i - 1) ? "\(seats[i - 1].name) · \(seats[i - 1].detail)" : "frei"
+    }
+
+    /// Ein iPhone, das am Host hängt, steuert diese Seite selbst: Ausschalten trennt es und ließe es ohne Kontrolle. Darum braucht es dann ein zweites A.
+    private func activate() {
+        guard index == 0 else { return }
+        if host.enabled, host.snapshot.players.contains(where: \.connected), confirmOff == nil {
+            let until = Date().addingTimeInterval(3)
+            confirmOff = until
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) { if confirmOff == until { confirmOff = nil } }
+            return
+        }
+        confirmOff = nil
+        host.enabled.toggle()
+    }
+
+    private var footer: some View {
+        VStack(spacing: 12) {
+            Rectangle().fill(Theme.line).frame(height: 1)
+            HStack(spacing: 36) {
+                Spacer()
+                Hint(key: "B", label: "Schließen").onTapGesture { close() }
+                if index == 0 { Hint(key: "A", label: host.enabled ? "Ausschalten" : "Einschalten") }
+            }
+        }
+        .padding(.horizontal, 56)
+        .padding(.bottom, 26)
+    }
+}
